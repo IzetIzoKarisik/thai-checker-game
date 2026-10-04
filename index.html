@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en" data-board="teak" data-pieces="marble">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#15110e">
+  <title>Mak-hos · หมากฮอส — Thai Checkers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Kanit:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== Icon sprite ===== -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-crown" viewBox="0 0 24 24"><path fill="currentColor" d="M3 7.5l4.6 3.8L12 4l4.4 7.3L21 7.5l-1.9 10.2H4.9L3 7.5zM5 19.2h14v1.8H5z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></symbol>
+    <symbol id="i-flip" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M7 4L3 8M7 4l4 4M17 20V4M17 20l-4-4M17 20l4-4"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-half" viewBox="0 0 24 24"><text x="12" y="17" text-anchor="middle" font-size="15" font-weight="700" font-family="Inter, sans-serif" fill="currentColor">½</text></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7.6 7.6 0 01-2 1.2L14.8 21h-4l-.3-2.4a7.6 7.6 0 01-2-1.2l-1.9.7-2-3.4 1.6-1.2a7.7 7.7 0 010-2.4L4.6 9.9l2-3.4 1.9.7a7.6 7.6 0 012-1.2L10.8 3h4l.3 2.4a7.6 7.6 0 012 1.2l1.9-.7 2 3.4-1.6 1.2a7.7 7.7 0 010 2.4z"/></symbol>
+    <symbol id="i-music" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M9.5 9.6a2.6 2.6 0 115 .8c0 1.7-2.5 2.1-2.5 3.9M12 17.3v.1"/></symbol>
+    <symbol id="i-first" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M18 5l-7 7 7 7M6 5v14"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="i-last" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M6 5l7 7-7 7M18 5v14"/></symbol>
+
+    <!-- How a king captures: it jumps the man and must land on the green ring, right behind it -->
+    <symbol id="diagram-king" viewBox="0 0 204 204">
+      <defs>
+        <radialGradient id="dg-w" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fffdf6"/><stop offset="1" stop-color="#d9c79f"/></radialGradient>
+        <radialGradient id="dg-b" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#6a5e54"/><stop offset="1" stop-color="#14100d"/></radialGradient>
+      </defs>
+      <rect width="204" height="204" rx="6" style="fill: var(--sq-light)"/>
+      <g style="fill: var(--sq-dark)">
+        <rect x="34" y="0" width="34" height="34"/><rect x="102" y="0" width="34" height="34"/><rect x="170" y="0" width="34" height="34"/>
+        <rect x="0" y="34" width="34" height="34"/><rect x="68" y="34" width="34" height="34"/><rect x="136" y="34" width="34" height="34"/>
+        <rect x="34" y="68" width="34" height="34"/><rect x="102" y="68" width="34" height="34"/><rect x="170" y="68" width="34" height="34"/>
+        <rect x="0" y="102" width="34" height="34"/><rect x="68" y="102" width="34" height="34"/><rect x="136" y="102" width="34" height="34"/>
+        <rect x="34" y="136" width="34" height="34"/><rect x="102" y="136" width="34" height="34"/><rect x="170" y="136" width="34" height="34"/>
+        <rect x="0" y="170" width="34" height="34"/><rect x="68" y="170" width="34" height="34"/><rect x="136" y="170" width="34" height="34"/>
+      </g>
+      <line x1="17" y1="187" x2="153" y2="51" stroke="#fff" stroke-opacity=".55" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round"/>
+      <circle cx="153" cy="51" r="14" fill="none" stroke="#5cc28f" stroke-width="4"/>
+      <circle cx="119" cy="85" r="13" fill="url(#dg-w)" stroke="#a8935f" stroke-width="1.5"/>
+      <circle cx="17" cy="187" r="13" fill="url(#dg-b)" stroke="#e3b04b" stroke-width="1.5"/>
+      <use href="#i-crown" x="8" y="178" width="18" height="18" style="color: #e3b04b"/>
+      <path d="M178 8l18 18M196 8l-18 18" stroke="#e2593f" stroke-width="4" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+
+  <!-- ===== Top bar ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true"><i></i><i></i></span>
+      <span class="brand__text">
+        <strong lang="th">หมากฮอส</strong>
+        <small>Mak-hos · Thai Checkers</small>
+      </span>
+    </div>
+    <nav class="topnav" aria-label="Main">
+      <a href="#" data-nav="pvp">2 Players</a>
+      <a href="#" data-open="rules">Rules</a>
+      <a href="#" data-nav="bot">vs Computer</a>
+      <a href="#" data-nav="online">Online</a>
+    </nav>
+    <div class="topbar__tools">
+      <button class="icon-btn" type="button" data-open="tour" aria-label="How to play" title="How to play">
+        <svg><use href="#i-help"/></svg>
+      </button>
+      <button class="icon-btn" type="button" id="music-btn" aria-label="Background music" aria-pressed="true" title="Background music">
+        <svg><use href="#i-music"/></svg>
+      </button>
+      <button class="icon-btn" type="button" data-open="settings" aria-label="Settings" title="Settings">
+        <svg><use href="#i-gear"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== Game ===== -->
+  <main class="game">
+    <section class="board-col" aria-label="Game board">
+
+      <!-- Top player (White when Black is at the bottom; swaps when the board is flipped) -->
+      <div class="player" id="player-top" data-color="w">
+        <span class="player__avatar" aria-hidden="true"><span class="mini-piece mini-piece--w"></span></span>
+        <div class="player__info">
+          <span class="player__name"><span class="player__who">Player 1</span><span class="thinking-dots" hidden aria-hidden="true"><i></i><i></i><i></i></span></span>
+          <span class="player__line"><span class="player__side">White · ฝ่ายขาว</span><span class="player__count" data-count title="Pieces left">8 left</span></span>
+          <span class="player__captured" data-captured aria-label="Captured pieces"></span>
+        </div>
+        <div class="clock" data-clock><svg><use href="#i-clock"/></svg><span>10:00</span></div>
+      </div>
+
+      <!-- Board -->
+      <div class="board-wrap">
+        <div class="board" id="board" role="grid" aria-label="Thai checkers board, 8 by 8"></div>
+      </div>
+
+      <!-- Status, on phones (on bigger screens it is in the side panel) -->
+      <div class="statusbar" id="statusbar">
+        <span class="status__dot" data-turn-dot></span>
+        <div>
+          <strong class="status__title js-title"></strong>
+          <span class="status__text js-text"></span>
+        </div>
+      </div>
+
+      <!-- Bottom player (Black by default: it moves first) -->
+      <div class="player" id="player-bottom" data-color="b">
+        <span class="player__avatar" aria-hidden="true"><span class="mini-piece mini-piece--b"></span></span>
+        <div class="player__info">
+          <span class="player__name"><span class="player__who">Player 2</span><span class="thinking-dots" hidden aria-hidden="true"><i></i><i></i><i></i></span></span>
+          <span class="player__line"><span class="player__side">Black · ฝ่ายดำ</span><span class="player__count" data-count title="Pieces left">8 left</span></span>
+          <span class="player__captured" data-captured aria-label="Captured pieces"></span>
+        </div>
+        <div class="clock" data-clock><svg><use href="#i-clock"/></svg><span>10:00</span></div>
+      </div>
+
+      <!-- Board guide (shown on wide screens, fills the left column) -->
+      <aside class="legend" aria-label="Board guide">
+        <h3>Board guide</h3>
+        <ul>
+          <li><i class="lg"><i class="hint-dot"></i></i><span>Where the selected piece can move</span></li>
+          <li><i class="lg"><i class="hint-ring"></i></i><span>Where it lands after a capture</span></li>
+          <li><i class="lg lg--must"></i><span>This piece <b>must</b> capture</span></li>
+          <li><i class="lg"><i class="x-mark"></i></i><span>A piece taken in the last move</span></li>
+          <li><i class="lg lg--king"><svg><use href="#i-crown"/></svg></i><span>A king <span lang="th">(ฮอส)</span> lands right behind the piece it captures</span></li>
+        </ul>
+      </aside>
+    </section>
+
+    <!-- Side panel -->
+    <aside class="panel" aria-label="Game panel">
+      <div class="panel__head">
+        <button class="mode-chip" type="button" title="Start a new game">vs Computer · Medium</button>
+      </div>
+
+      <div class="status" id="status">
+        <span class="status__dot" data-turn-dot></span>
+        <div>
+          <strong class="status__title js-title"></strong>
+          <p class="status__text js-text"></p>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button role="tab" class="tab is-active" aria-selected="true" data-tab="moves">Moves</button>
+        <button role="tab" class="tab" aria-selected="false" data-tab="rules">Rules</button>
+      </div>
+
+      <div class="tabpanel tabpanel--moves" data-tabpanel="moves">
+        <div class="review-bar" role="toolbar" aria-label="Look back through the game">
+          <button class="rv" type="button" data-review="first" title="First position" aria-label="First position"><svg><use href="#i-first"/></svg></button>
+          <button class="rv" type="button" data-review="prev" title="Previous move" aria-label="Previous move"><svg><use href="#i-prev"/></svg></button>
+          <button class="rv" type="button" data-review="next" title="Next move" aria-label="Next move"><svg><use href="#i-next"/></svg></button>
+          <button class="rv" type="button" data-review="last" title="Latest position" aria-label="Latest position"><svg><use href="#i-last"/></svg></button>
+          <button class="rv rv--live" type="button" id="review-live" hidden>Back to game</button>
+        </div>
+        <div class="mv-head" aria-hidden="true">
+          <span></span>
+          <span><i class="mini-piece mini-piece--b"></i>Black</span>
+          <span><i class="mini-piece mini-piece--w"></i>White</span>
+        </div>
+        <div class="mv-scroll"><ol class="movelist" id="movelist"></ol></div>
+      </div>
+
+      <div class="tabpanel" data-tabpanel="rules" hidden>
+        <ul class="rules">
+          <li><b>Setup</b> 8 men each, on the dark squares of your first two rows. Black moves first.</li>
+          <li><b>Numbers</b> The 32 playable squares are numbered 1–32, starting at Black's lower-left corner. The move list uses them.</li>
+          <li><b>Men · เบี้ย</b> move one square diagonally <em>forward</em>, and capture forward only.</li>
+          <li><b>Capture · กิน</b> is compulsory. Finish every jump in a chain; pick any chain you like.</li>
+          <li><b>Promotion</b> A man reaching the far row becomes a king <span lang="th">(ฮอส · Hos)</span>; the move ends there.</li>
+          <li><b>King · ฮอส</b> flies any distance diagonally, forward or back.</li>
+          <li><b>King capture</b> from any distance, but it must land on the square <em>directly behind</em> the captured piece.</li>
+          <li><b>Win</b> Capture all enemy pieces, or leave them without a legal move.</li>
+          <li><b>Draw</b> By agreement; when the same position comes up three times; after 25 moves each without a capture or a man move; or when each side has only one king left and nobody can force a win.</li>
+        </ul>
+        <figure class="diagram">
+          <svg role="img" aria-label="A king jumps a man and must land on the square right behind it"><use href="#diagram-king"/></svg>
+          <figcaption>The king flies over empty squares, jumps the man, and must land on the <b>green ring</b>: the square right behind it. The red × square is not allowed.</figcaption>
+        </figure>
+        <p class="rules__more"><button class="btn" type="button" data-open="tour">How to play</button></p>
+      </div>
+
+      <div class="controls" role="toolbar" aria-label="Game controls">
+        <button class="ctrl" type="button" title="New game" data-action="new"><svg><use href="#i-plus"/></svg><span>New</span></button>
+        <button class="ctrl" type="button" title="Undo move" data-action="undo"><svg><use href="#i-undo"/></svg><span>Undo</span></button>
+        <button class="ctrl" type="button" title="Flip board" data-action="flip"><svg><use href="#i-flip"/></svg><span>Flip</span></button>
+        <button class="ctrl" type="button" title="Offer draw" data-action="draw"><svg><use href="#i-half"/></svg><span>Draw</span></button>
+        <button class="ctrl ctrl--danger" type="button" title="Resign" data-action="resign"><svg><use href="#i-flag"/></svg><span>Resign</span></button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ===== Settings drawer ===== -->
+  <div class="drawer" id="settings" hidden>
+    <div class="drawer__backdrop" data-close></div>
+    <div class="drawer__sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="drawer__head">
+        <h2 id="settings-title">Settings</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close"><svg><use href="#i-x"/></svg></button>
+      </div>
+
+      <h3>Board</h3>
+      <div class="swatches" data-setting="board">
+        <button type="button" class="swatch" data-value="green"><span class="swatch__tiles" style="--l:#ebecd0;--d:#739552"></span>Green</button>
+        <button type="button" class="swatch" data-value="brown"><span class="swatch__tiles" style="--l:#f0d9b5;--d:#b58863"></span>Brown</button>
+        <button type="button" class="swatch" data-value="teak"><span class="swatch__tiles" style="--l:#ecd3a5;--d:#7b4a26"></span>Thai Teak</button>
+        <button type="button" class="swatch" data-value="marble"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-marble.jpg)"></span>Marble</button>
+        <button type="button" class="swatch" data-value="onyx"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-onyx.jpg)"></span>Black &amp; white</button>
+        <button type="button" class="swatch" data-value="emerald"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-emerald.jpg)"></span>Emerald</button>
+      </div>
+
+      <h3>Pieces</h3>
+      <div class="swatches" data-setting="pieces">
+        <button type="button" class="swatch" data-value="marble"><span class="swatch__piece swatch__piece--marble"></span>Marble</button>
+        <button type="button" class="swatch" data-value="gold"><span class="swatch__piece swatch__piece--gold"></span>Black &amp; gold</button>
+        <button type="button" class="swatch" data-value="classic"><span class="swatch__piece swatch__piece--classic"></span>Classic</button>
+        <button type="button" class="swatch" data-value="caps"><span class="swatch__piece swatch__piece--caps"></span>Bottle caps <small lang="th">ฝาขวด</small></button>
+      </div>
+
+      <h3>Help on the board</h3>
+      <label class="toggle"><input type="checkbox" checked data-toggle="hints"><span></span>Show legal moves</label>
+      <label class="toggle"><input type="checkbox" checked data-toggle="numbers"><span></span>Show square numbers</label>
+      <label class="toggle"><input type="checkbox" checked data-toggle="must"><span></span>Highlight forced captures</label>
+
+      <h3>Sound</h3>
+      <label class="toggle"><input type="checkbox" checked data-toggle="sound"><span></span>Move sounds</label>
+      <label class="slider"><span>Volume</span><input type="range" min="0" max="100" step="5" value="80" data-slider="sound" aria-label="Move sounds volume"></label>
+      <label class="toggle"><input type="checkbox" checked data-toggle="music"><span></span>Background music</label>
+      <label class="slider"><span>Volume</span><input type="range" min="0" max="100" step="5" value="55" data-slider="music" aria-label="Music volume"></label>
+
+      <p class="drawer__more"><button class="btn btn--wide" type="button" data-open="tour">How to play</button></p>
+    </div>
+  </div>
+
+  <!-- ===== New game window ===== -->
+  <div class="modal" id="newgame" hidden>
+    <div class="modal__card modal__card--form" role="dialog" aria-modal="true" aria-labelledby="ng-title">
+      <h2 id="ng-title">New game</h2>
+
+      <h3>Play against</h3>
+      <div class="swatches" data-choice="mode">
+        <button type="button" class="swatch" data-value="bot">Computer<small>Play the bot</small></button>
+        <button type="button" class="swatch" data-value="pvp">A friend<small>Same screen</small></button>
+        <button type="button" class="swatch" data-value="online">Online<small>Another device</small></button>
+      </div>
+
+      <div data-only="bot">
+        <h3>Your side</h3>
+        <div class="swatches" data-choice="side">
+          <button type="button" class="swatch" data-value="b">Black<small>Moves first</small></button>
+          <button type="button" class="swatch" data-value="w">White<small>Moves second</small></button>
+          <button type="button" class="swatch" data-value="random">Random<small>Surprise me</small></button>
+        </div>
+
+        <h3>Difficulty</h3>
+        <div class="swatches" data-choice="level">
+          <button type="button" class="swatch" data-value="easy">Easy</button>
+          <button type="button" class="swatch" data-value="medium">Medium</button>
+          <button type="button" class="swatch" data-value="hard">Hard</button>
+        </div>
+        <p class="hint" id="ng-level-hint"></p>
+      </div>
+
+      <div data-only="pvp">
+        <h3>Clock</h3>
+        <div class="swatches swatches--4" data-choice="minutes">
+          <button type="button" class="swatch" data-value="0">Off</button>
+          <button type="button" class="swatch" data-value="5">5 min</button>
+          <button type="button" class="swatch" data-value="10">10 min</button>
+          <button type="button" class="swatch" data-value="15">15 min</button>
+        </div>
+      </div>
+
+      <p class="hint hint--warn" id="ng-note" hidden>The game in progress will be lost.</p>
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="button" id="ng-start" data-autofocus>Start game</button>
+        <button class="btn" type="button" data-close>Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Play online window ===== -->
+  <div class="modal" id="online" hidden>
+    <div class="modal__card modal__card--form" role="dialog" aria-modal="true" aria-labelledby="on-title">
+      <h2 id="on-title">Play online</h2>
+
+      <div data-on-step="choose">
+        <p class="hint on-intro">Play a friend on another phone or computer. One of you creates a room and sends the link or the code. The other opens the link, or types the code under “Join a room”.</p>
+        <div class="modal__actions">
+          <button class="btn btn--primary" type="button" data-on-go="create" data-autofocus>Create a room</button>
+          <button class="btn" type="button" data-on-go="join">Join a room</button>
+          <button class="btn" type="button" data-close>Cancel</button>
+        </div>
+      </div>
+
+      <div data-on-step="create" hidden>
+        <h3>Your side</h3>
+        <div class="swatches" data-on-choice="side">
+          <button type="button" class="swatch" data-value="b">Black<small>Moves first</small></button>
+          <button type="button" class="swatch" data-value="w">White<small>Moves second</small></button>
+          <button type="button" class="swatch" data-value="random">Random<small>Surprise me</small></button>
+        </div>
+        <h3>Clock</h3>
+        <div class="swatches swatches--4" data-on-choice="minutes">
+          <button type="button" class="swatch" data-value="0">Off</button>
+          <button type="button" class="swatch" data-value="5">5 min</button>
+          <button type="button" class="swatch" data-value="10">10 min</button>
+          <button type="button" class="swatch" data-value="15">15 min</button>
+        </div>
+        <p class="hint hint--warn" id="on-note" hidden>The game in progress will be lost.</p>
+        <div class="modal__actions">
+          <button class="btn btn--primary" type="button" id="on-create" data-autofocus>Create room</button>
+          <button class="btn" type="button" data-on-go="choose">Back</button>
+        </div>
+      </div>
+
+      <div data-on-step="share" hidden>
+        <p class="hint on-intro">Send this to your friend. They open the link, or type the code under Online → Join a room.</p>
+        <div class="room-code" id="on-code" aria-live="polite"></div>
+        <input class="room-link" id="on-link" type="text" readonly aria-label="Link to the room">
+        <p class="hint hint--warn" id="on-local-note" hidden>This link only works on this computer. For another device, put the game online first (see RULES.md), or give your friend the code and let them open the game from wherever it is online.</p>
+        <div class="modal__actions modal__actions--row">
+          <button class="btn btn--primary" type="button" id="on-copy-link" data-autofocus>Copy link</button>
+          <button class="btn" type="button" id="on-copy-code">Copy code</button>
+        </div>
+        <div class="modal__actions">
+          <button class="btn" type="button" id="on-share" hidden>Share…</button>
+          <button class="btn" type="button" id="on-cancel">Cancel room</button>
+        </div>
+      </div>
+
+      <div data-on-step="join" hidden>
+        <label class="field"><span>Room code</span>
+          <input id="on-join-code" type="text" maxlength="200" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7M2QX" data-autofocus>
+        </label>
+        <div class="modal__actions">
+          <button class="btn btn--primary" type="button" id="on-join">Join</button>
+          <button class="btn" type="button" data-on-go="choose">Back</button>
+        </div>
+      </div>
+
+      <p class="room-status" id="on-status" role="status"></p>
+    </div>
+  </div>
+
+  <!-- ===== Game-over window ===== -->
+  <div class="modal" id="gameover" hidden>
+    <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="go-title">
+      <button class="icon-btn modal__x" type="button" data-close aria-label="See the board"><svg><use href="#i-x"/></svg></button>
+      <div class="modal__trophy" aria-hidden="true"><svg><use href="#i-crown"/></svg></div>
+      <h2 id="go-title"></h2>
+      <p class="modal__reason"><span id="go-reason"></span> · <span id="go-thai" lang="th"></span></p>
+      <div class="modal__score">
+        <div><span class="mini-piece mini-piece--w"></span><b id="go-name-w">Player 1</b><small id="go-left-w"></small></div>
+        <span class="modal__vs" id="go-score"></span>
+        <div><span class="mini-piece mini-piece--b"></span><b id="go-name-b">Player 2</b><small id="go-left-b"></small></div>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="button" data-action="rematch" data-autofocus>Rematch</button>
+        <button class="btn" type="button" data-action="rematch-swap" id="go-swap">Rematch as <span id="go-swap-side"></span></button>
+        <button class="btn" type="button" data-action="review-game">Review the game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Question window (replaces the browser's confirm box) ===== -->
+  <div class="modal" id="confirm" hidden>
+    <div class="modal__card modal__card--small" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+      <h2 id="confirm-title"></h2>
+      <p class="modal__reason" id="confirm-text"></p>
+      <div class="modal__actions modal__actions--row">
+        <button class="btn" type="button" id="confirm-no"></button>
+        <button class="btn btn--primary" type="button" id="confirm-yes"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== How to play ===== -->
+  <div class="modal" id="tour" hidden>
+    <div class="modal__card modal__card--tour" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+      <h2 id="tour-title">How to play</h2>
+      <ol class="tour">
+        <li><b>Move</b> Click a piece, or drag it. Dots show where it can go. Men move one square diagonally <em>forward</em>.</li>
+        <li><b>You must capture</b> Jump over an enemy piece whenever you can — it is compulsory. Keep jumping with the same piece while it can. Men only capture forward.</li>
+        <li><b>Become a king</b> Reach the far row and your man is crowned <span lang="th">ฮอส</span>. A king flies any distance along a diagonal, forward or back.</li>
+        <li><b>King captures</b> A king may jump from far away, but it must land on the square right behind the captured piece.
+          <svg class="tour__diagram" role="img" aria-label="A king jumps a man and must land on the green ring"><use href="#diagram-king"/></svg></li>
+        <li><b>Square numbers</b> The 32 playable squares are numbered 1–32, starting at Black's lower-left corner. Moves are written with them, like 10-14 or 22×15.</li>
+        <li><b>Play online</b> Press <em>Online</em> in the top bar (on a phone: New, then Online) to make a room. Send the link or the code to a friend, and they can join from their own phone or computer.</li>
+        <li><b>Win or draw</b> Capture every enemy piece, or leave them with no legal move, to win. A draw is agreed, or happens when the same position comes up three times, after 25 moves each without a capture or a man move, or when each side has only one king left.</li>
+      </ol>
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="button" data-close data-autofocus>Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <div class="sr-only" id="announcer" aria-live="polite"></div>
+
+  <script src="rules.js"></script>
+  <script src="bot.js"></script>
+  <script src="sound.js"></script>
+  <script src="music.js"></script>
+  <script src="game.js"></script>
+  <script src="vendor/peerjs.min.js"></script>
+  <script src="online.js"></script>
+  <script src="render.js"></script>
+  <script src="input.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
