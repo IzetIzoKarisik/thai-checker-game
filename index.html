@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#15110e">
   <title>Mak-hos · หมากฮอส — Thai Checkers</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23241a12'/%3E%3Ccircle cx='24' cy='24' r='15' fill='%23f3e8d0' stroke='%23a8935f' stroke-width='2'/%3E%3Ccircle cx='41' cy='41' r='15' fill='%23181310' stroke='%23e3b04b' stroke-width='2.5'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Kanit:wght@500;600&display=swap" rel="stylesheet">
@@ -22,6 +23,7 @@
     <symbol id="i-half" viewBox="0 0 24 24"><text x="12" y="17" text-anchor="middle" font-size="15" font-weight="700" font-family="Inter, sans-serif" fill="currentColor">½</text></symbol>
     <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7.6 7.6 0 01-2 1.2L14.8 21h-4l-.3-2.4a7.6 7.6 0 01-2-1.2l-1.9.7-2-3.4 1.6-1.2a7.7 7.7 0 010-2.4L4.6 9.9l2-3.4 1.9.7a7.6 7.6 0 012-1.2L10.8 3h4l.3 2.4a7.6 7.6 0 012 1.2l1.9-.7 2 3.4-1.6 1.2a7.7 7.7 0 010 2.4z"/></symbol>
     <symbol id="i-music" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 7.5V12l3 2"/></symbol>
     <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M9.5 9.6a2.6 2.6 0 115 .8c0 1.7-2.5 2.1-2.5 3.9M12 17.3v.1"/></symbol>
@@ -30,7 +32,7 @@
     <symbol id="i-next" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></symbol>
     <symbol id="i-last" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M6 5l7 7-7 7M18 5v14"/></symbol>
 
-    <!-- How a king captures: it jumps the man and must land on the green ring, right behind it -->
+    <!-- How a king captures: it jumps the man and must land on the gold ring, right behind it -->
     <symbol id="diagram-king" viewBox="0 0 204 204">
       <defs>
         <radialGradient id="dg-w" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fffdf6"/><stop offset="1" stop-color="#d9c79f"/></radialGradient>
@@ -46,7 +48,8 @@
         <rect x="0" y="170" width="34" height="34"/><rect x="68" y="170" width="34" height="34"/><rect x="136" y="170" width="34" height="34"/>
       </g>
       <line x1="17" y1="187" x2="153" y2="51" stroke="#fff" stroke-opacity=".55" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round"/>
-      <circle cx="153" cy="51" r="14" fill="none" stroke="#5cc28f" stroke-width="4"/>
+      <circle cx="153" cy="51" r="14" fill="rgba(247,212,120,.25)" stroke="#e8b84a" stroke-width="4"/>
+      <circle cx="153" cy="51" r="5" fill="#dcaa40" stroke="#4a2c08" stroke-opacity=".5"/>
       <circle cx="119" cy="85" r="13" fill="url(#dg-w)" stroke="#a8935f" stroke-width="1.5"/>
       <circle cx="17" cy="187" r="13" fill="url(#dg-b)" stroke="#e3b04b" stroke-width="1.5"/>
       <use href="#i-crown" x="8" y="178" width="18" height="18" style="color: #e3b04b"/>
@@ -64,12 +67,16 @@
       </span>
     </div>
     <nav class="topnav" aria-label="Main">
-      <a href="#" data-nav="pvp">2 Players</a>
       <a href="#" data-open="rules">Rules</a>
-      <a href="#" data-nav="bot">vs Computer</a>
       <a href="#" data-nav="online">Online</a>
     </nav>
     <div class="topbar__tools">
+      <div class="mode-pick">
+        <span class="mode-hint" aria-hidden="true"><span class="mode-hint__long">Game mode:</span><span class="mode-hint__short">Mode:</span></span>
+        <button class="mode-chip" type="button" title="Change the game mode or start a new game">
+          <svg aria-hidden="true"><use href="#i-swap"/></svg><span class="mode-chip__label">vs Computer · Medium</span>
+        </button>
+      </div>
       <button class="icon-btn" type="button" data-open="tour" aria-label="How to play" title="How to play">
         <svg><use href="#i-help"/></svg>
       </button>
@@ -90,7 +97,7 @@
       <div class="player" id="player-top" data-color="w">
         <span class="player__avatar" aria-hidden="true"><span class="mini-piece mini-piece--w"></span></span>
         <div class="player__info">
-          <span class="player__name"><span class="player__who">Player 1</span><span class="thinking-dots" hidden aria-hidden="true"><i></i><i></i><i></i></span></span>
+          <span class="player__name"><span class="player__who">Player 2</span><span class="thinking-dots" hidden aria-hidden="true"><i></i><i></i><i></i></span></span>
           <span class="player__line"><span class="player__side">White · ฝ่ายขาว</span><span class="player__count" data-count title="Pieces left">8 left</span></span>
           <span class="player__captured" data-captured aria-label="Captured pieces"></span>
         </div>
@@ -108,6 +115,7 @@
         <div>
           <strong class="status__title js-title"></strong>
           <span class="status__text js-text"></span>
+          <button class="btn btn--primary btn--small js-claim" type="button" hidden>Claim the win</button>
         </div>
       </div>
 
@@ -115,7 +123,7 @@
       <div class="player" id="player-bottom" data-color="b">
         <span class="player__avatar" aria-hidden="true"><span class="mini-piece mini-piece--b"></span></span>
         <div class="player__info">
-          <span class="player__name"><span class="player__who">Player 2</span><span class="thinking-dots" hidden aria-hidden="true"><i></i><i></i><i></i></span></span>
+          <span class="player__name"><span class="player__who">Player 1</span><span class="thinking-dots" hidden aria-hidden="true"><i></i><i></i><i></i></span></span>
           <span class="player__line"><span class="player__side">Black · ฝ่ายดำ</span><span class="player__count" data-count title="Pieces left">8 left</span></span>
           <span class="player__captured" data-captured aria-label="Captured pieces"></span>
         </div>
@@ -137,15 +145,12 @@
 
     <!-- Side panel -->
     <aside class="panel" aria-label="Game panel">
-      <div class="panel__head">
-        <button class="mode-chip" type="button" title="Start a new game">vs Computer · Medium</button>
-      </div>
-
       <div class="status" id="status">
         <span class="status__dot" data-turn-dot></span>
         <div>
           <strong class="status__title js-title"></strong>
           <p class="status__text js-text"></p>
+          <button class="btn btn--primary btn--small js-claim" type="button" hidden>Claim the win</button>
         </div>
       </div>
 
@@ -184,7 +189,7 @@
         </ul>
         <figure class="diagram">
           <svg role="img" aria-label="A king jumps a man and must land on the square right behind it"><use href="#diagram-king"/></svg>
-          <figcaption>The king flies over empty squares, jumps the man, and must land on the <b>green ring</b>: the square right behind it. The red × square is not allowed.</figcaption>
+          <figcaption>The king flies over empty squares, jumps the man, and must land on the <b>gold ring</b>: the square right behind it. The red × square is not allowed.</figcaption>
         </figure>
         <p class="rules__more"><button class="btn" type="button" data-open="tour">How to play</button></p>
       </div>
@@ -212,10 +217,10 @@
       <div class="swatches" data-setting="board">
         <button type="button" class="swatch" data-value="green"><span class="swatch__tiles" style="--l:#ebecd0;--d:#739552"></span>Green</button>
         <button type="button" class="swatch" data-value="brown"><span class="swatch__tiles" style="--l:#f0d9b5;--d:#b58863"></span>Brown</button>
-        <button type="button" class="swatch" data-value="teak"><span class="swatch__tiles" style="--l:#ecd3a5;--d:#7b4a26"></span>Thai Teak</button>
-        <button type="button" class="swatch" data-value="marble"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-marble.jpg)"></span>Marble</button>
-        <button type="button" class="swatch" data-value="onyx"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-onyx.jpg)"></span>Black &amp; white</button>
-        <button type="button" class="swatch" data-value="emerald"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-emerald.jpg)"></span>Emerald</button>
+        <button type="button" class="swatch" data-value="teak"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-teak.webp)"></span>Thai Teak</button>
+        <button type="button" class="swatch" data-value="marble"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-marble.webp)"></span>Marble</button>
+        <button type="button" class="swatch" data-value="onyx"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-onyx.webp)"></span>Black &amp; white</button>
+        <button type="button" class="swatch" data-value="emerald"><span class="swatch__tiles swatch__tiles--photo" style="background-image:url(img/board-emerald.webp)"></span>Emerald</button>
       </div>
 
       <h3>Pieces</h3>
@@ -340,7 +345,7 @@
 
       <div data-on-step="join" hidden>
         <label class="field"><span>Room code</span>
-          <input id="on-join-code" type="text" maxlength="200" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7M2QX" data-autofocus>
+          <input id="on-join-code" type="text" maxlength="200" autocomplete="off" inputmode="numeric" spellcheck="false" placeholder="483920" data-autofocus>
         </label>
         <div class="modal__actions">
           <button class="btn btn--primary" type="button" id="on-join">Join</button>
@@ -360,9 +365,9 @@
       <h2 id="go-title"></h2>
       <p class="modal__reason"><span id="go-reason"></span> · <span id="go-thai" lang="th"></span></p>
       <div class="modal__score">
-        <div><span class="mini-piece mini-piece--w"></span><b id="go-name-w">Player 1</b><small id="go-left-w"></small></div>
+        <div><span class="mini-piece mini-piece--w"></span><b id="go-name-w">Player 2</b><small id="go-left-w"></small></div>
         <span class="modal__vs" id="go-score"></span>
-        <div><span class="mini-piece mini-piece--b"></span><b id="go-name-b">Player 2</b><small id="go-left-b"></small></div>
+        <div><span class="mini-piece mini-piece--b"></span><b id="go-name-b">Player 1</b><small id="go-left-b"></small></div>
       </div>
       <div class="modal__actions">
         <button class="btn btn--primary" type="button" data-action="rematch" data-autofocus>Rematch</button>
@@ -393,9 +398,9 @@
         <li><b>You must capture</b> Jump over an enemy piece whenever you can — it is compulsory. Keep jumping with the same piece while it can. Men only capture forward.</li>
         <li><b>Become a king</b> Reach the far row and your man is crowned <span lang="th">ฮอส</span>. A king flies any distance along a diagonal, forward or back.</li>
         <li><b>King captures</b> A king may jump from far away, but it must land on the square right behind the captured piece.
-          <svg class="tour__diagram" role="img" aria-label="A king jumps a man and must land on the green ring"><use href="#diagram-king"/></svg></li>
+          <svg class="tour__diagram" role="img" aria-label="A king jumps a man and must land on the gold ring"><use href="#diagram-king"/></svg></li>
         <li><b>Square numbers</b> The 32 playable squares are numbered 1–32, starting at Black's lower-left corner. Moves are written with them, like 10-14 or 22×15.</li>
-        <li><b>Play online</b> Press <em>Online</em> in the top bar (on a phone: New, then Online) to make a room. Send the link or the code to a friend, and they can join from their own phone or computer.</li>
+        <li><b>Play online</b> Press the gold <em>Game mode</em> button at the top, then <em>Online</em>, to make a room. Send the link or the code to a friend, and they can join from their own phone or computer.</li>
         <li><b>Win or draw</b> Capture every enemy piece, or leave them with no legal move, to win. A draw is agreed, or happens when the same position comes up three times, after 25 moves each without a capture or a man move, or when each side has only one king left.</li>
       </ol>
       <div class="modal__actions">

@@ -3,7 +3,7 @@
 
    The two browsers talk to each other directly (WebRTC, through the PeerJS
    library in vendor/). A free public server only introduces them: the room
-   code is the name the host's browser signs in under (makhos-K7M2QX), and the
+   code is the name the host's browser signs in under (makhos-483920), and the
    friend asks the server to connect them to that name. After that, the moves
    go straight from one browser to the other.
 
@@ -15,26 +15,35 @@
      hello     friend -> host   { ver, token }              "let me in" (token: a secret that keeps the seat ours)
      welcome   host -> friend   { hostColor, minutes }      "you are in; this is the game"
      refuse    host -> friend   { why: "full" | "version" | "moved" | "stopped" }   ("moved": the same friend came in from another window)
-     state     both             { paths, result }           everything finished so far (sent right after hello / welcome)
+     state     both             { paths, result, left, elapsed }   everything finished so far (sent right after hello / welcome).
+                                 result may carry claimed: "away" | "time" (the sender took the win because we were gone);
+                                 left = the sender's own clock, elapsed = how long the running turn has run, as the sender saw it
      move      both             { n, path, left }           one finished turn: its squares; left = seconds left on the mover's clock
      over      both             { winner, reason }          resigned, or out of time
      offer     both                                         a draw offer;   answer { accept } is the reply
      rematch   both                                         play again with the sides swapped;   rematch-no is the refusal
      leave     both                                         goodbye
-     ping      both                                         "still here" every few seconds, so that a friend who vanished is noticed
+     ping      both             { at }                      "still here" every few seconds, so that a friend who vanished is noticed
+     pong      both             { at }                      the answer: the same `at` sent back, which proves that the link worked just now
    ========================================================================== */
 
-const ROOM_PREFIX = "makhos-";                              // every room is called makhos-XXXXXX on the introduction server
-const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // no 0, O, 1 or I: they are easy to mix up
+const ROOM_PREFIX = "makhos-";                              // every room is called makhos-NNNNNN on the introduction server
+const ROOM_DIGITS = "0123456789";                           // a room code is 6 digits
+const TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";  // the secret seat token: no 0, O, 1 or I
 const ROOM_CODE_LENGTH = 6;
-const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
+const ROOM_CODE_PATTERN = /^[0-9]{6}$/;
 const TOKEN_PATTERN = /^[A-HJ-NP-Z2-9]{16}$/;
 const PROTOCOL_VERSION = 1;
 const PEER_OPTIONS = { debug: 0 };                          // the free public PeerJS server (and its relay servers for tricky networks)
-const AWAY_SECONDS = 60;                                    // how long a friend may be gone before we offer to claim the win
+const AWAY_SECONDS = 120;                                   // how long a friend may be gone before we may claim the win
+const CLAIM_WAIT_SECONDS = 10;                              // how long the link must be down before we end the game because their clock ran out
+const GIVE_UP_MINUTES = 10;                                 // a game is over: how long we go on calling a friend who has not heard the result yet
+const CLOCK_SLACK_SECONDS = 2;                              // two clocks this close are the same clock (network delay)
 const DIAL_SECONDS = 15;                                    // how long to wait for a room to answer
 const PING_SECONDS = 3;                                     // how often we say "still here" ...
 const SILENCE_SECONDS = 15;                                 // ... and how long a quiet friend is believed to be there
+const SEAT_PREFIX = "makhos.seat.";                         // the secret we gave a room, kept for the whole browser (see seatToken)
+const SEAT_HOURS = 24;
 
 const net = {
   peer: null,            // our connection to the introduction server
@@ -52,24 +61,28 @@ const net = {
   rematchAsked: false,   // we asked for a rematch and wait for the answer
   stoppedBecause: "",
   heard: 0,              // when the friend last sent anything (a Date.now() time)
+  healthyAt: 0,          // the last time a ping of ours came back as a pong (see heartbeat): the last time the link surely worked
   timer: null,           // for "try again in a moment" and for waiting for a room to answer
-  awayTimer: null,       // for "the friend has been gone for a minute"
-  awayAsking: false,
+  awayStart: 0,          // when the friend was first missed (a Date.now() time); 0 while they are here
+  silentSince: 0,        // when we last heard from them before the link was lost (or, after a reload, when we last saved the game)
+  silentFor: 0,          // how long they had been silent when the link came back, in seconds
+  wasLost: false,        // the link was lost since it last worked: say so when it is back
+  resultDelivered: false, // the game is over and our friend knows: the link was up when it ended
 };
 
 /* ==========================================================================
    1. Small helpers
    ========================================================================== */
 
-function randomText(length) {
-  return [...crypto.getRandomValues(new Uint8Array(length))].map((n) => ROOM_ALPHABET[n % ROOM_ALPHABET.length]).join("");
+function randomText(length, alphabet) {
+  return [...crypto.getRandomValues(new Uint8Array(length))].map((n) => alphabet[n % alphabet.length]).join("");
 }
 
 // A room code from whatever the player typed or pasted (the code itself, or the whole link).
 function cleanCode(text) {
   const fromLink = /[?&]room=([^&#\s]+)/i.exec(text);
   const letters = (fromLink ? fromLink[1] : text).toUpperCase();
-  return [...letters].filter((letter) => ROOM_ALPHABET.includes(letter)).join("").slice(0, ROOM_CODE_LENGTH);
+  return [...letters].filter((letter) => ROOM_DIGITS.includes(letter)).join("").slice(0, ROOM_CODE_LENGTH);
 }
 
 // The link to give to a friend: this page, with the room in it.
@@ -117,8 +130,8 @@ const colorOfTurn = (index) => (index % 2 === 0 ? "b" : "w");
    ========================================================================== */
 
 function send(message) {
-  if (!net.link || !net.open) return;
-  try { net.link.send(message); } catch { /* the connection just broke: its close handler deals with it */ }
+  if (!net.link || !net.open) return false;
+  try { net.link.send(message); return true; } catch { return false; /* the connection just broke: its close handler deals with it */ }
 }
 
 // Called by game.js when we finished a turn.
@@ -127,10 +140,13 @@ function sendMove(index, path, left) {
 }
 
 const myPaths = () => game.moves.map((move) => move.path);
-const myResult = () => (game.winner ? { winner: game.winner, reason: game.reason } : null);
+const myResult = () => (game.winner ? { winner: game.winner, reason: game.reason, claimed: game.claimed } : null);
 
 function sendState() {
-  send({ t: "state", paths: myPaths(), result: myResult() });
+  const own = game.clock ? game.clock[game.humanColor] : null;                    // our clock as it was when the running turn started
+  const elapsed = game.clock && game.turnStart ? (Date.now() - game.turnStart) / 1000 : 0;   // ... and how long that turn has run
+  const sent = send({ t: "state", paths: myPaths(), result: myResult(), left: own, elapsed });
+  if (sent && game.winner) net.resultDelivered = true;                             // they have the result now
 }
 
 // Called by game.js after we resigned or ran out of time.
@@ -148,7 +164,7 @@ function createRoom(options) {
   net.role = "host";
   net.options = options;
   net.state = "hosting";
-  registerRoom(randomText(ROOM_CODE_LENGTH), 1);
+  registerRoom(randomText(ROOM_CODE_LENGTH, ROOM_DIGITS), 1);
 }
 
 // Signs in on the introduction server under the room's name. If that name is taken, a new room code is tried.
@@ -163,7 +179,7 @@ function registerRoom(code, attempt) {
     if (net.peer !== peer) return;
     if (error.type === "unavailable-id") {
       peer.destroy();
-      if (net.state === "hosting" && attempt < 5) registerRoom(randomText(ROOM_CODE_LENGTH), attempt + 1);
+      if (net.state === "hosting" && attempt < 5) registerRoom(randomText(ROOM_CODE_LENGTH, ROOM_DIGITS), attempt + 1);
       else if (net.state === "playing") retryLater(() => registerRoom(code, attempt));   // our own old name: the server lets go of it after a moment
       else roomProblem("Couldn't open a room. Please try again.");
       return;
@@ -185,8 +201,27 @@ function joinRoom(code) {
   net.role = "guest";
   net.state = "joining";
   net.code = code;
-  net.token = randomText(16);
+  net.token = seatToken(code);
   dial();
+}
+
+// The secret that keeps our seat in a room. It is kept for the whole browser, so that joining the same room again
+// (after a closed tab, or a first try that was cut off) is the same friend coming back, not a third person.
+function seatToken(code) {
+  try {
+    for (const key of Object.keys(localStorage)) {                    // old ones are thrown away
+      if (!key.startsWith(SEAT_PREFIX)) continue;
+      const old = JSON.parse(localStorage.getItem(key));
+      if (!old || Date.now() - old.at > SEAT_HOURS * 3600 * 1000) localStorage.removeItem(key);
+    }
+    const kept = JSON.parse(localStorage.getItem(SEAT_PREFIX + code));
+    if (kept && TOKEN_PATTERN.test(kept.token)) return kept.token;
+    const token = randomText(16, TOKEN_ALPHABET);
+    localStorage.setItem(SEAT_PREFIX + code, JSON.stringify({ token, at: Date.now() }));
+    return token;
+  } catch {
+    return randomText(16, TOKEN_ALPHABET);                                            // no storage: a new secret each time
+  }
 }
 
 // The guest signs in under a random name, then calls the room.
@@ -218,6 +253,7 @@ function dialFailed(message) {
 
 function redial() {
   if (net.role !== "guest" || net.state !== "playing" || net.open) return;
+  if (gaveUpOnFriend()) { giveUp(); return; }
   const old = net.peer;
   net.peer = null;
   net.link = null;
@@ -227,7 +263,29 @@ function redial() {
 
 function retryLater(action) {
   clearTimeout(net.timer);
-  net.timer = setTimeout(action, 3000);
+  if (gaveUpOnFriend()) { giveUp(); return; }
+  const afterGame = game.winner ? (Date.now() - game.endedAt > 60000 ? 30000 : 10000) : 3000;     // (after the game there is no hurry)
+  net.timer = setTimeout(action, afterGame);
+}
+
+// The game is over. A friend who has not heard the result (we ended it while they were gone) is still called for a while, so
+// that they learn it when they come back; once they know, or after ten minutes, we stop. Without this the page would go on
+// calling an empty room for ever.
+function gaveUpOnFriend() {
+  return Boolean(game.winner) && (net.resultDelivered || Date.now() - game.endedAt > GIVE_UP_MINUTES * 60000);
+}
+
+function giveUp() {
+  clearTimeout(net.timer);
+  const peer = net.peer;
+  Object.assign(net, { peer: null, link: null, open: false, state: "stopped", stoppedBecause: "Your opponent has left the room." });
+  if (peer) peer.destroy();
+  forgetOnlineGame(game.room);
+}
+
+// Called by game.js when an online game ends: if the link is up, our friend is told (or works it out) at once.
+function onlineGameEnded() {
+  net.resultDelivered = net.open;
 }
 
 function onPeerError(error) {
@@ -250,12 +308,13 @@ function listenTo(link) {
 // Forgets the room. A friend who is still there is told that we left.
 function leaveRoom() {
   clearTimeout(net.timer);
-  clearTimeout(net.awayTimer);
   if (net.open) send({ t: "leave" });
   const peer = net.peer;
+  if (net.state === "playing" || net.state === "stopped") forgetOnlineGame({ code: net.code, role: net.role });   // (a room that was only being opened or called has no game to forget)
   Object.assign(net, {
     peer: null, link: null, open: false, everOpen: false, state: "idle", role: "", code: "", token: "", options: null,
-    queue: [], current: null, offerPending: false, rematchAsked: false, stoppedBecause: "", awayAsking: false,
+    queue: [], current: null, offerPending: false, rematchAsked: false, stoppedBecause: "",
+    awayStart: 0, silentSince: 0, silentFor: 0, healthyAt: 0, wasLost: false, resultDelivered: false,
   });
   if (peer) setTimeout(() => peer.destroy(), 300);          // (a moment, so that the goodbye can leave first)
 }
@@ -268,23 +327,25 @@ function newOnlineGame() {
   net.rematchAsked = false;
 }
 
-// After a reload: go back into the room of the game that was restored.
+// After a reload (or when a closed tab is opened again): go back into the room of the game that was restored.
 function resumeOnline() {
   const { code, role, token } = game.room;
-  Object.assign(net, { role, code, token, state: "playing" });
+  Object.assign(net, { role, code, token, state: "playing", wasLost: true, silentSince: game.savedAt || Date.now() });
+  markAway();
   if (role === "host") registerRoom(code, 1);
   else dial();
-  startAwayTimer();
 }
 
 function setOpen(open) {
   if (net.open === open) return;
   net.open = open;
   if (open) {
+    net.silentFor = net.silentSince ? (Date.now() - net.silentSince) / 1000 : 0;   // (see validClaim)
+    net.silentSince = 0;
     net.everOpen = true;
-    net.heard = Date.now();
-    clearTimeout(net.awayTimer);
-    if (net.awayAsking) $("#confirm").cancel?.();           // the question "claim the win?" is not needed any more
+    net.heard = net.healthyAt = Date.now();
+    net.awayStart = 0;                                       // they are here: the "claim the win" countdown is over
+    if (net.wasLost) { net.wasLost = false; toast("Connected to your opponent again."); }
   }
   render();
 }
@@ -293,7 +354,7 @@ function setOpen(open) {
    4. Messages that arrive
    ========================================================================== */
 
-const FRIEND_MESSAGES = { state: onState, move: onMove, over: onOver, offer: onOffer, answer: onAnswer, rematch: onRematch, "rematch-no": onRematchNo, leave: onLeave };
+const FRIEND_MESSAGES = { state: onState, move: onMove, over: onOver, offer: onOffer, answer: onAnswer, rematch: onRematch, "rematch-no": onRematchNo, leave: onLeave, ping: onPing, pong: onPong };
 
 function onMessage(link, message) {
   if (!message || typeof message.t !== "string") return;
@@ -303,7 +364,7 @@ function onMessage(link, message) {
     else if (link !== net.link) return;
     else if (message.t === "welcome") onWelcome(message);
     else if (message.t === "refuse") onRefuse(message);
-    else if (net.open && FRIEND_MESSAGES[message.t]) FRIEND_MESSAGES[message.t](message);
+    else if (net.open && Object.hasOwn(FRIEND_MESSAGES, message.t)) FRIEND_MESSAGES[message.t](message);
   } catch (error) {
     console.error("online message", message.t, error);
   }
@@ -360,6 +421,7 @@ function onWelcome(welcome) {
 }
 
 function onRefuse({ why }) {
+  if (net.role !== "guest") return;                         // only a friend who called a room can be turned away (a host cannot be told to stop)
   clearTimeout(net.timer);
   const messages = {
     version: "Your friend has another version of the game. Reload both pages and try again.",
@@ -379,8 +441,14 @@ function onState(their) {
   for (let i = 0; i < Math.min(known.length, paths.length); i++) {
     if (known[i].join() !== paths[i].join()) { stopGame("The two boards no longer match."); return; }
   }
+  if (game.winner) return;                                  // our game is over: nothing to play (they learn the result from our own state message)
+  const friend = otherColor(game.humanColor);
   for (const path of paths.slice(known.length)) net.queue.push({ path });
-  if (their.result) net.queue.push({ result: their.result });
+  net.queue.push({ sync: {                                  // the clocks, once their turns are shown (see applyClockSync)
+    count: paths.length, behind: paths.length > known.length, left: their.left, elapsed: their.elapsed,
+    friendBefore: game.clock ? game.clock[friend] : null, receivedAt: Date.now(),
+  } });
+  if (their.result) net.queue.push({ result: their.result, fromState: true });
   pump();
 }
 
@@ -392,7 +460,7 @@ function knownPaths() {
 function onMove(message) {
   const path = validPath(message.path);
   if (!path) { stopGame("The other game sent something unexpected."); return; }
-  if (game.winner) return;
+  if (game.winner) { sendState(); return; }                 // our game is over (we may have claimed the win while they were away): this tells them
   const expected = knownPaths().length;
   if (message.n < expected) return;                         // we have this one already
   if (message.n !== expected || colorOfTurn(expected) === game.humanColor) { stopGame("The two boards no longer match."); return; }
@@ -418,6 +486,7 @@ function onLeave() {
   net.link = null;
   net.open = false;
   link?.close();
+  forgetOnlineGame(game.room);
 }
 
 function onLinkClosed(link) {
@@ -429,20 +498,22 @@ function onLinkClosed(link) {
   net.offerPending = false;
   net.rematchAsked = false;
   const wasOpen = net.open;
+  if (wasOpen) net.silentSince = net.healthyAt;             // (how long we were cut off: see validClaim)
   setOpen(false);
   if (game.winner) return;                                  // the game is over: nothing to wait for
   if (wasOpen) toast("The connection to your friend was lost.");
-  startAwayTimer();
+  net.wasLost = true;
+  markAway();
   if (net.role === "guest") retryLater(redial);
 }
 
 // Something is wrong that cannot be repaired (the two games disagree): stop, and say why.
 function stopGame(reason) {
   clearTimeout(net.timer);
-  clearTimeout(net.awayTimer);
   const link = net.link;
   Object.assign(net, { state: "stopped", stoppedBecause: reason, link: null, open: false, queue: [], current: null });
   link?.close();
+  forgetOnlineGame(game.room);                              // it can not go on: a reload or a closed tab must not bring it back
   render();
   toast(`The online game stopped. ${reason}`);
 }
@@ -450,6 +521,18 @@ function stopGame(reason) {
 // The connection can die without anybody telling us (a closed laptop, a lost signal) and the browser
 // takes about a minute to notice. So we say "ping" every few seconds, and a friend who has been silent
 // for too long is treated as gone.
+//
+// A page that was frozen (a phone in the background) gets all the messages that were waiting at once when it wakes up, so
+// "when did we last hear from them" tells nothing about the time it was frozen. A pong that echoes a recent ping does: it
+// proves that the link worked a moment ago. That is `healthyAt`, which dates the start of an outage (see validClaim).
+function onPing(message) {
+  if (Number.isFinite(message.at)) send({ t: "pong", at: message.at });
+}
+
+function onPong(message) {
+  if (Number.isFinite(message.at) && Date.now() - message.at < (PING_SECONDS * 2 + 1) * 1000) net.healthyAt = Date.now();
+}
+
 function heartbeat() {
   if (!net.open || !net.link) return;
   if (Date.now() - net.heard > SILENCE_SECONDS * 1000) {
@@ -458,7 +541,7 @@ function heartbeat() {
     onLinkClosed(link);
     return;
   }
-  send({ t: "ping" });
+  send({ t: "ping", at: Date.now() });
 }
 setInterval(heartbeat, PING_SECONDS * 1000);
 
@@ -472,8 +555,23 @@ function pump() {
   if (!task) return;
   net.current = task;
   const next = () => { net.current = null; pump(); };
-  if (task.result) { applyResult(task.result); next(); }
+  if (task.result) { applyResult(task.result, task.fromState); next(); }
+  else if (task.sync) { applyClockSync(task.sync); next(); }
+  else if (game.winner) next();                             // the game ended while turns were waiting: they are not played
   else playTurn(task, next);
+}
+
+// After a reconnection our friend tells us how their game stands. The clocks must neither lose nor gain time:
+//  - if they were ahead of us, their own clock (as it stood after their turn) replaces our guess for it, but never with more time than we had;
+//  - if it is our turn, it has been running since they moved, not since we heard about it: the time we were away counts.
+function applyClockSync({ count, behind, left, elapsed, friendBefore, receivedAt }) {
+  if (!game.clock || game.winner || count !== game.moves.length) return;   // not at the same turn as they were: their numbers do not fit
+  const friend = otherColor(game.humanColor);
+  if (behind && Number.isFinite(left)) game.clock[friend] = Math.max(0, Math.min(left, friendBefore, game.minutes * 60));
+  if (game.turn === game.humanColor && game.turnStart && Number.isFinite(elapsed) && elapsed > 0) {
+    game.turnStart = Math.min(game.turnStart, receivedAt - Math.min(elapsed, game.minutes * 60) * 1000);
+  }
+  renderClocks();
 }
 
 // The legal steps of a turn given as squares, or null if it is not allowed right now.
@@ -496,14 +594,17 @@ function stepsFor(path) {
 function playTurn({ path, left }, done) {
   const token = thinkToken;
   const mover = game.turn;
+  const clockBefore = game.clock ? game.clock[mover] : null;
   const steps = stepsFor(path);
   if (!steps) { stopGame("A move arrived that is not allowed."); return; }
   const playStep = (index) => {
     if (token !== thinkToken) return;                       // a new game started meanwhile
-    makeMove(path[index], steps[index]);
+    const watchingOldMoves = view.review !== null;          // looking back through the game: stay there, the button says there is a new move
+    if (watchingOldMoves) view.missedMove = true;
+    makeMove(path[index], steps[index], { keepReview: watchingOldMoves });
     if (index + 1 < steps.length) { setTimeout(() => playStep(index + 1), 550); return; }
-    if (game.clock && Number.isFinite(left)) {              // their own clock is the right one
-      game.clock[mover] = Math.max(0, Math.min(left, game.minutes * 60));
+    if (game.clock && Number.isFinite(left)) {              // their own clock is the right one (but it never goes up)
+      game.clock[mover] = Math.max(0, Math.min(left, clockBefore, game.minutes * 60));
       renderClocks();
     }
     done();
@@ -512,14 +613,28 @@ function playTurn({ path, left }, done) {
 }
 
 // How the other game ended, if it ended without a move: only a loss of theirs (or a draw we agreed to) counts.
-function applyResult(result) {
+// The one result against us that is believed: our friend took the win because we were gone (`claimed`), and we can see that
+// it is true. That can only arrive in a state message, right after the link came back.
+function applyResult(result, fromState = false) {
   if (game.winner || !result) return;
   const youWin = result.winner === game.humanColor;
   const agreedDraw = result.winner === "draw" && net.offerPending;
-  if (!youWin && !agreedDraw) return;
+  const claim = fromState && result.winner === otherColor(game.humanColor) ? validClaim(result.claimed) : null;
+  if (!youWin && !agreedDraw && !claim) return;
   net.offerPending = false;
-  endGame(result.winner, agreedDraw ? "Draw by agreement" : String(result.reason || "Your opponent resigned").slice(0, 60));
+  const reason = claim === "time" ? "You ran out of time while you were away"
+    : claim ? "Your opponent took the win while you were away"
+    : agreedDraw ? "Draw by agreement"
+    : String(result.reason || "Your opponent resigned").slice(0, 60);
+  endGame(result.winner, reason);
   render();
+}
+
+// Was it true? "away": we really were silent for about as long as a claim needs. "time": our own clock has run out too.
+function validClaim(kind) {
+  if (kind === "away" && net.silentFor >= AWAY_SECONDS - SILENCE_SECONDS) return "away";   // (they notice us gone up to 15 s after we do)
+  if (kind === "time" && game.clock && clockLeft(game.humanColor) <= CLOCK_SLACK_SECONDS) return "time";
+  return null;
 }
 
 /* ==========================================================================
@@ -542,9 +657,11 @@ async function askOnlineDraw() {
 async function onOffer() {
   if (game.winner) return;
   if (net.offerPending) { agreeDraw(); return; }            // we both offered at the same moment
-  const accept = await askConfirm({ title: "Your opponent offers a draw", text: "Do you accept?", yes: "Accept", no: "Decline" });
-  send({ t: "answer", accept: accept && !game.winner });
-  if (accept && !game.winner) endDraw();
+  const accept = await askConfirm({ title: "Your opponent offers a draw", text: "Do you accept?", yes: "Accept", no: "Decline", stillNeeded: () => !game.winner && net.open });
+  const agreed = accept && !game.winner && net.open;       // (if the connection dropped meanwhile, our friend cannot hear "yes": the game goes on)
+  if (accept && !agreed && !game.winner) toast("The connection was lost, so the draw was not agreed.");
+  send({ t: "answer", accept: agreed });
+  if (agreed) endDraw();
 }
 
 function agreeDraw() {
@@ -577,7 +694,7 @@ function requestRematch() {
 async function onRematch() {
   if (!game.winner) return;
   if (net.rematchAsked) { startRematch(); return; }         // we both wanted it
-  const yes = await askConfirm({ title: "Play again?", text: "Your opponent wants a rematch, with the sides swapped.", yes: "Play again", no: "No thanks" });
+  const yes = await askConfirm({ title: "Play again?", text: "Your opponent wants a rematch, with the sides swapped.", yes: "Play again", no: "No thanks", stillNeeded: () => Boolean(game.winner) && net.open });
   if (!game.winner || !net.open) return;
   send({ t: yes ? "rematch" : "rematch-no" });
   if (yes) startRematch();
@@ -595,25 +712,45 @@ function startRematch() {
 
 /* ==========================================================================
    7. A friend who is gone
+
+   While the link is down the status card counts down. When AWAY_SECONDS have passed, it offers a button:
+   the player may take the win. Nothing pops up and nothing repeats. If the friend's clock runs out while they
+   are gone, the game ends a few seconds later, without waiting for them. Either way the friend is told when
+   they come back (see applyResult).
    ========================================================================== */
 
-function startAwayTimer() {
-  clearTimeout(net.awayTimer);
-  net.awayTimer = setTimeout(askToClaimWin, AWAY_SECONDS * 1000);
+// The friend is missed from now on (until the link works again).
+function markAway() {
+  if (!net.awayStart) net.awayStart = Date.now();
 }
 
-async function askToClaimWin() {
-  if (net.open || game.winner || game.mode !== "online" || net.state !== "playing") return;
-  net.awayAsking = true;
-  const claim = await askConfirm({ title: "Your opponent has not come back", text: "You can claim the win, or keep waiting.", yes: "Claim the win", no: "Keep waiting" });
-  net.awayAsking = false;
-  if (net.open || game.winner) return;                      // they came back, or the game ended, while we were asking
-  if (claim) {
-    endGame(game.humanColor, `${SIDE[otherColor(game.humanColor)].name} left the game`);
-    render();
-  } else {
-    startAwayTimer();
-  }
+const awaySeconds = () => (net.awayStart ? (Date.now() - net.awayStart) / 1000 : 0);
+
+// Called by the clock tick: keeps the countdown in the status card moving.
+function showAwayCountdown() {
+  if (net.state === "playing" && !net.open && !game.winner && net.awayStart) renderStatus();
+}
+
+// The button in the status card.
+function claimWin() {
+  if (game.mode !== "online" || net.state !== "playing" || net.open || game.winner || awaySeconds() < AWAY_SECONDS) return;
+  endByClaim("away", `${SIDE[otherColor(game.humanColor)].name} left the game`);
+}
+
+function endByClaim(kind, reason) {
+  game.claimed = kind;                                      // (kept with the result, so that our friend is told when they are back)
+  endGame(game.humanColor, reason);
+  render();
+}
+
+// Our friend's clock has run out, and they are not here to say so. If the link has been down for a few seconds
+// (so that it is them, and not just our own page that was away), the game is ours. Returns true if it ended.
+function claimTimeoutIfAway() {
+  if (net.open || net.state !== "playing" || awaySeconds() < CLAIM_WAIT_SECONDS) return false;
+  commitClock();
+  game.clock[game.turn] = 0;
+  endByClaim("time", `${SIDE[game.turn].name} ran out of time`);
+  return true;
 }
 
 /* ==========================================================================
@@ -675,7 +812,7 @@ function showRoomReady() {
 
 // Leaving an online game that is still on needs a yes (the friend wins it).
 async function confirmLeavingOnlineGame() {
-  if (game.mode !== "online" || game.winner) return true;
+  if (game.mode !== "online" || game.winner || onlineStopped()) return true;
   return askConfirm({ title: "Leave your online game?", text: "Your opponent will win this game.", yes: "Leave the game", danger: true });
 }
 
@@ -738,6 +875,7 @@ function bindOnline() {
     navigator.share({ title: "Mak-hos · Thai checkers", text: `Play Thai checkers with me! Room code: ${net.code}`, url: shareUrl(net.code) }).catch(() => {});
   });
   $("#on-cancel").addEventListener("click", () => closeDialog(dialog));
+  $$(".js-claim").forEach((button) => button.addEventListener("click", claimWin));      // in the status card
 
   // Closing the window before a game has started cancels the room.
   dialog.onclosed = () => { if (net.state === "hosting" || net.state === "joining") leaveRoom(); };
@@ -751,10 +889,13 @@ function onlineStopped() {
   return game.mode === "online" && net.state === "stopped";
 }
 
-// What the status card says while the friend cannot be reached.
+// What the status card says while the friend cannot be reached. (The text is short: on a phone it is one line.)
 function onlineTroubleStatus(dot) {
   if (net.state === "stopped") return { tone: "warn", dot, title: "Online game stopped", text: net.stoppedBecause };
-  if (!net.everOpen) return { tone: "warn", dot, title: "Connecting to your opponent…", text: "One moment." };
-  const text = net.role === "host" ? "Waiting for your opponent to come back." : "Trying to reconnect to your opponent.";
-  return { tone: "warn", dot, title: "Connection lost", text };
+  const title = net.everOpen ? "Connection lost" : "Connecting to your opponent…";
+  if (!net.awayStart) return { tone: "warn", dot, title, text: "One moment." };
+  const left = Math.ceil(AWAY_SECONDS - awaySeconds());
+  if (left <= 0) return { tone: "warn", dot, title: "Your opponent is away", text: "They have not come back.", claim: true };
+  const wait = net.role === "host" ? "Waiting for them." : "Reconnecting.";
+  return { tone: "warn", dot, title, text: `${wait} Claim the win in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` };
 }

@@ -21,7 +21,7 @@ function render(step) {
   updateTitle();
 
   if (focusedSquare) $(`[data-sq="${focusedSquare}"]`)?.focus();
-  if (step) {
+  if (step && view.review === null) {                          // (a move that arrives while we look back is not animated on the old position)
     if (!step.skipSlide) animatePiece(step.from, step.to);
     fadeCaptured(step.captured);
   }
@@ -221,7 +221,7 @@ function currentStatus() {
     return {
       tone: "calm", dot,
       title: `Reviewing move ${view.review} of ${game.moves.length}`,
-      text: "Use ◀ ▶ or the arrow keys. Press Back to game to carry on.",
+      text: matchMedia("(pointer: fine)").matches ? "Step with ◀ ▶ or the arrow keys. Back to game returns." : "Step with ◀ ▶. Back to game returns.",
     };
   }
   if (game.winner) {
@@ -257,13 +257,14 @@ function currentStatus() {
 let lastAnnouncedStatus = "";
 
 function renderStatus() {
-  const { tone, title, text, dot } = currentStatus();
+  const { tone, title, text, dot, claim } = currentStatus();
   for (const id of ["status", "statusbar"]) {
     const box = $(`#${id}`);
     box.className = `${id}${tone ? " is-" + tone : ""}`;
     $("[data-turn-dot]", box).dataset.color = dot;
     $(".js-title", box).textContent = title;
     $(".js-text", box).textContent = text;
+    $(".js-claim", box).hidden = !claim;                       // online: the friend has been gone long enough to take the win
   }
   if (title !== lastAnnouncedStatus) {                       // tell screen readers when the situation changes
     lastAnnouncedStatus = title;
@@ -295,10 +296,10 @@ function renderPlayers() {
     bar.dataset.color = color;
     $(".mini-piece", bar).className = `mini-piece mini-piece--${color}`;
     $(".player__who", bar).textContent = playerLabel(color);
-    $(".player__side", bar).textContent = `${SIDE[color].name} · ${SIDE[color].thai}`;
+    $(".player__side", bar).innerHTML = `${SIDE[color].name}<span class="player__thai" lang="th"> · ${SIDE[color].thai}</span>`;   // (fixed texts, no user input)
     $("[data-count]", bar).textContent = `${counts[color]} left`;
     $("[data-captured]", bar).innerHTML =
-      `<span class="mini-piece mini-piece--${enemy}"></span>`.repeat(PIECES_PER_SIDE - counts[enemy])
+      `<span class="mini-piece mini-piece--${enemy}"></span>`.repeat(Math.max(0, PIECES_PER_SIDE - counts[enemy]))
       + (lead > 0 ? `<b class="player__lead" title="Ahead by ${lead}">+${lead}</b>` : "");
     $(".thinking-dots", bar).hidden = !thinking;
     bar.classList.toggle("is-thinking", thinking);
@@ -330,7 +331,8 @@ function renderModeChip() {
   const text = game.mode === "bot" ? `vs Computer · ${LEVEL_NAMES[game.level]}`
     : game.mode === "online" ? `Online · ${game.room.code}${clock}`
     : `2 players${clock}`;
-  $(".mode-chip").textContent = text;
+  $(".mode-chip__label").textContent = text;
+  $(".mode-chip").setAttribute("aria-label", `Change game mode. Now: ${text}`);
   $$("[data-nav]").forEach((link) => link.classList.toggle("is-active", link.dataset.nav === game.mode));
 }
 
@@ -338,7 +340,13 @@ function renderModeChip() {
 function renderControls() {
   $('[data-action="undo"]').disabled = !canUndo();
   $('[data-action="draw"]').disabled = !canOfferDraw();
-  $('[data-action="resign"]').disabled = Boolean(game.winner);
+  // After the game the Resign button becomes "Result": it brings back the game-over window (Rematch, Review), which
+  // is the only place for them, in case it was closed.
+  const over = Boolean(game.winner);
+  const resignButton = $('[data-action="resign"]');
+  $("span", resignButton).textContent = over ? "Result" : "Resign";
+  resignButton.title = over ? "Show the result" : "Resign";
+  resignButton.classList.toggle("ctrl--danger", !over);
 
   const moves = game.moves.length;
   const position = view.review === null ? moves : view.review;
@@ -347,7 +355,9 @@ function renderControls() {
   $('[data-review="prev"]').disabled = !reviewable || position === 0;
   $('[data-review="next"]').disabled = !reviewable || position >= moves;
   $('[data-review="last"]').disabled = !reviewable || position >= moves;
+  if (view.review === null) view.missedMove = false;
   $("#review-live").hidden = view.review === null;
+  $("#review-live").textContent = view.missedMove ? "Back to game · new move" : "Back to game";
   $(".board-wrap").classList.toggle("is-reviewing", view.review !== null);
 }
 
@@ -420,5 +430,17 @@ function showGameOver() {
   $("#go-swap-side").textContent = SIDE[otherColor(game.humanColor)].name;
 
   // Wait a moment, so the last move can be seen before the window covers the board.
-  setTimeout(() => { if (game.winner) openDialog($("#gameover")); }, 700);
+  // If another window is open (Settings, a question), the result waits until it is closed.
+  setTimeout(() => {
+    if (!game.winner) return;
+    if (dialogStack.length > 0) gameOverWaiting = true;
+    else openGameOverWindow();
+  }, 700);
+}
+
+let gameOverWaiting = false;          // the result window wants to open, but another window is in the way (see closeDialog)
+
+function openGameOverWindow() {
+  gameOverWaiting = false;
+  if (game.winner) openDialog($("#gameover"));
 }

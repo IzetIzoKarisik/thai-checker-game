@@ -35,7 +35,7 @@
   --board: min(calc(100vh - 330px), calc(100vw - 500px), 760px);
   --sq: calc(var(--board) / 8);
   --lift: calc(var(--sq) * .055);
-  --frame: clamp(8px, calc(var(--board) * .02), 16px);
+  --frame: clamp(9px, calc(var(--board) * .03), 22px);
 
   --radius: 14px;
   --font: "IBM Plex Sans Thai", "Inter", system-ui, sans-serif;
@@ -43,7 +43,7 @@
 }
 
 /* Board themes */
-[data-board="teak"]  { --sq-light: #efd8ab; --sq-dark: #84502b; --wood: #4a2c15; --wood-2: #2c1a0b; }
+[data-board="teak"]  { --sq-light: #efd8ab; --sq-dark: #84502b; --wood: #6e411f; --wood-2: #432610; }
 [data-board="green"] { --sq-light: #ebecd0; --sq-dark: #739552; --wood: #33302b; --wood-2: #211f1c; }
 [data-board="brown"] { --sq-light: #f0d9b5; --sq-dark: #b58863; --wood: #3a2a1d; --wood-2: #231911; }
 [data-board="marble"] { --sq-light: #efe7d9; --sq-dark: #5b3a2a; --wood: #3a2b24; --wood-2: #1f1713; }   /* cream and brown marble */
@@ -60,8 +60,8 @@
   --skin-filter: none;
 }
 [data-pieces="marble"] {
-  --disc-w: url("img/piece-white.png");
-  --disc-b: url("img/piece-black.png");
+  --disc-w: url("img/piece-white.webp");
+  --disc-b: url("img/piece-black.webp");
   --skin-w: center / cover no-repeat var(--disc-w);
   --skin-w-shadow: 0 1.5px 3px rgba(0, 0, 0, .55);
   --skin-b: center / cover no-repeat var(--disc-b);
@@ -70,8 +70,8 @@
   --skin-filter: none;
 }
 [data-pieces="gold"] {                  /* a gold disc (White's side) and a black lacquer disc with gold inlay (Black's side) */
-  --disc-w: url("img/piece-gold.png");
-  --disc-b: url("img/piece-lacquer.png");
+  --disc-w: url("img/piece-gold.webp");
+  --disc-b: url("img/piece-lacquer.webp");
   --skin-w: center / cover no-repeat var(--disc-w);
   --skin-w-shadow: 0 1.5px 3px rgba(0, 0, 0, .55);
   --skin-b: center / cover no-repeat var(--disc-b);
@@ -90,7 +90,10 @@
 
 /* Base ------------------------------------------------------------------ */
 *, *::before, *::after { box-sizing: border-box; }
+html { color-scheme: dark; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }   /* phones: no zoom by double tap, no grey flash on a tapped square (pinch zoom still works) */
 html, body { margin: 0; }
+* { scrollbar-width: thin; scrollbar-color: #5b4a3a transparent; }       /* slim scroll bars in the colour of the wood */
+::selection { background: rgba(227, 176, 75, .35); }
 body {
   min-height: 100vh;
   color: var(--text);
@@ -139,18 +142,24 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand__mark { position: relative; width: 38px; height: 38px; }
 .brand__mark i { position: absolute; width: 25px; height: 25px; border-radius: 50%; }
+/* The logo is two pieces of the chosen set */
 .brand__mark i:first-child {
   left: 0; top: 0;
-  background: radial-gradient(circle at 35% 30%, #fffdf6, #e2d0a8);
-  box-shadow: 0 2px 0 #a8935f, 0 4px 6px rgba(0, 0, 0, .5);
+  background: var(--skin-w); border-radius: var(--skin-radius); filter: var(--skin-filter);
+  box-shadow: var(--skin-w-shadow), 0 4px 8px rgba(0, 0, 0, .45);
 }
 .brand__mark i:last-child {
   right: 0; bottom: 0;
-  background: radial-gradient(circle at 35% 30%, #6a5e54, #14100d);
-  box-shadow: 0 0 0 1.5px rgba(227, 176, 75, .6), 0 2px 0 #050403, 0 4px 6px rgba(0, 0, 0, .6);
+  background: var(--skin-b); border-radius: var(--skin-radius); filter: var(--skin-filter);
+  box-shadow: var(--skin-b-shadow), 0 4px 8px rgba(0, 0, 0, .55);
 }
 .brand__text { display: flex; flex-direction: column; line-height: 1.05; }
-.brand__text strong { font: 600 22px/1.1 var(--font-display); letter-spacing: .3px; color: var(--gold); }
+.brand__text strong {                 /* gold lettering */
+  font: 600 23px/1.2 var(--font-display); letter-spacing: .3px;
+  background: linear-gradient(180deg, #fbe3a0, var(--gold) 55%, var(--gold-deep));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .5));
+}
 .brand__text small { margin-top: 2px; color: var(--muted); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; }
 
 .topnav { display: flex; gap: 4px; flex: 1; margin-left: 12px; }
@@ -160,22 +169,52 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
   transition: color .15s, background .15s;
 }
 .topnav a:hover { color: var(--text); background: var(--line); }
-.topnav a.is-active { color: var(--text); box-shadow: inset 0 -2px 0 var(--gold); border-radius: 8px 8px 0 0; }
+.topnav a.is-active { color: var(--gold); background: var(--gold-soft); box-shadow: inset 0 0 0 1px rgba(227, 176, 75, .3); }
 
-.topbar__tools { display: flex; gap: 4px; }
+.topbar__tools { display: flex; align-items: center; gap: 4px; min-width: 0; }
+/* The kind of game ("vs Computer · Medium"). A solid gold button, the brightest thing in the bar, so nobody misses it:
+   click it to change the mode or start a new game. It pulses a few times when the page opens, then stays still. */
+.mode-chip {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  height: 40px; padding: 0 14px 0 12px;
+  border: 1px solid rgba(255, 232, 168, .65); border-radius: 99px;
+  background: linear-gradient(180deg, #f3cd75, var(--gold) 55%, var(--gold-deep));
+  color: #2a1c08;
+  font-weight: 700; font-size: 13.5px; white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 2px 10px rgba(0, 0, 0, .45), 0 0 14px rgba(227, 176, 75, .3);
+  transition: filter .15s, transform .1s;
+  animation: mode-attention 1.8s ease-out 1s 3;
+}
+.mode-pick { display: flex; align-items: center; gap: 2px; min-width: 0; margin-right: 12px; }
+.mode-hint { flex: none; margin-right: 2px; color: var(--muted); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.mode-hint__short { display: none; }                   /* phones say "Mode:" */
+.mode-chip svg { flex: none; font-size: 18px; }
+.mode-chip__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mode-chip::after { content: "▾"; flex: none; font-size: 12px; }
+.mode-chip:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.mode-chip:active { transform: translateY(1px); }
+@keyframes mode-attention {
+  0%   { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 2px 10px rgba(0, 0, 0, .45), 0 0 0 0 rgba(243, 205, 117, .75); }
+  70%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 2px 10px rgba(0, 0, 0, .45), 0 0 0 14px rgba(243, 205, 117, 0); }
+}
 .icon-btn {
   position: relative;
   display: grid; place-items: center;
-  width: 40px; height: 40px; border: 0; border-radius: 10px;
+  width: 40px; height: 40px; border: 0; border-radius: 50%;
   background: transparent; font-size: 21px; color: var(--muted);
   transition: background .15s, color .15s;
 }
-.icon-btn:hover { background: var(--line); color: var(--gold); }
+.icon-btn:hover { background: var(--gold-soft); color: var(--gold); }
 /* The music button is gold when the music plays, and crossed out when it is off */
 #music-btn[aria-pressed="true"] { color: var(--gold); }
 #music-btn[aria-pressed="false"]::after {
   content: ""; position: absolute; left: 9px; right: 9px; top: 50%; height: 2px;
   background: currentColor; border-radius: 2px; rotate: -45deg;
+}
+
+@media (max-width: 1180px) {
+  .topbar { gap: 16px; }
+  .brand__text small { display: none; }
 }
 
 /* Layout ---------------------------------------------------------------- */
@@ -188,7 +227,7 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
   align-items: start;
   padding: 30px 24px 44px;
 }
-.board-col { display: flex; flex-direction: column; gap: 30px; }
+.board-col { display: flex; flex-direction: column; gap: 38px; }
 
 /* Wide screens: players on the left, board in the middle, panel on the right */
 @media (min-width: 1280px) {
@@ -216,26 +255,38 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
   position: relative;
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
   min-height: 66px; padding: 10px 14px;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background:
+    linear-gradient(180deg, rgba(255, 224, 170, .05), transparent 45%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .07), 0 10px 24px rgba(0, 0, 0, .35);
   transition: border-color .2s, box-shadow .2s;
+}
+.player::before {                     /* a gold bar on the edge of the card whose turn it is */
+  content: ""; position: absolute; left: -1px; top: 14px; bottom: 14px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--gold);
+  opacity: 0; transition: opacity .2s;
 }
 .player.is-turn {
   border-color: rgba(227, 176, 75, .6);
-  box-shadow: 0 0 0 1px rgba(227, 176, 75, .25), 0 8px 26px rgba(227, 176, 75, .14);
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .1), 0 0 0 1px rgba(227, 176, 75, .25), 0 10px 30px rgba(227, 176, 75, .16);
 }
+.player.is-turn::before { opacity: 1; box-shadow: 0 0 10px var(--gold); }
 .player.is-thinking { animation: card-pulse 1.6s ease-in-out infinite; }
-@keyframes card-pulse { 50% { box-shadow: 0 0 0 1px rgba(227, 176, 75, .5), 0 8px 30px rgba(227, 176, 75, .3); } }
+@keyframes card-pulse { 50% { box-shadow: 0 0 0 1px rgba(227, 176, 75, .5), 0 10px 34px rgba(227, 176, 75, .3); } }
 
-.player__avatar {
+.player__avatar {                     /* the piece rests in a round dish; gold ring when it is your turn */
   display: grid; place-items: center;
-  width: 46px; height: 46px; border-radius: 12px;
-  background: radial-gradient(circle at 50% 35%, var(--panel-3), #1c1612);
-  box-shadow: inset 0 0 0 1px var(--line);
+  width: 50px; height: 50px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, #3b3027, #150f0b);
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, .65), inset 0 0 0 1px var(--line), 0 1px 0 rgba(255, 224, 170, .08);
+  transition: box-shadow .2s;
 }
-.player__avatar .mini-piece { width: 28px; height: 28px; }
+.player.is-turn .player__avatar {
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, .65), 0 0 0 2px var(--gold), 0 0 14px rgba(227, 176, 75, .4);
+}
+.player__avatar .mini-piece { width: 34px; height: 34px; }
 .player__info { display: flex; flex-direction: column; min-width: 0; }
 .player__name { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 700; font-size: 15.5px; white-space: nowrap; }
 .player__who { overflow: hidden; text-overflow: ellipsis; }
@@ -288,20 +339,27 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
   width: var(--board); height: var(--board);
   border-radius: 4px;
 }
-/* The wooden frame, drawn behind the board */
+/* The wooden frame, drawn behind the board. From the top layer down: the two diagonal joints of the
+   mitred corners, the four sides lit from the top left, the wood grain (tinted by the board's own
+   wood colour), and the colour itself. */
 .board-wrap::before {
   content: ""; position: absolute; z-index: -1;
   inset: calc(var(--frame) * -1);
-  border-radius: 12px;
+  border-radius: 10px;
   background:
-    repeating-linear-gradient(92deg, rgba(0, 0, 0, .07) 0 2px, transparent 2px 9px),
+    linear-gradient(45deg, transparent calc(50% - 1.5px), rgba(0, 0, 0, .5) calc(50% - .5px), rgba(255, 224, 170, .16) calc(50% + .5px), transparent calc(50% + 1.5px)),
+    linear-gradient(-45deg, transparent calc(50% - 1.5px), rgba(0, 0, 0, .5) calc(50% - .5px), rgba(255, 224, 170, .16) calc(50% + .5px), transparent calc(50% + 1.5px)),
+    conic-gradient(from -45deg, rgba(255, 224, 170, .18) 0 25%, rgba(0, 0, 0, .06) 0 50%, rgba(0, 0, 0, .30) 0 75%, rgba(255, 224, 170, .05) 0),
+    url("img/frame-grain.webp") center / 100% 100%,
     linear-gradient(145deg, var(--wood), var(--wood-2));
+  background-blend-mode: normal, normal, normal, overlay, normal;
   box-shadow:
-    inset 0 1px 0 rgba(255, 224, 170, .25),
-    inset 0 0 0 2px rgba(0, 0, 0, .25),
-    0 1px 0 #1d1107, 0 2px 0 #1a0f06, 0 3px 0 #170d05, 0 4px 0 #140b04, 0 5px 0 #110903, 0 6px 0 #0e0702,   /* the thickness of the board */
-    0 18px 28px rgba(0, 0, 0, .55),
-    0 38px 70px rgba(0, 0, 0, .45);
+    inset 0 1px 0 rgba(255, 224, 170, .3),
+    inset 0 0 0 1px rgba(0, 0, 0, .4),
+    inset 0 0 0 3px rgba(255, 224, 170, .05),
+    0 1px 0 #1d1107, 0 2px 0 #1a0f06, 0 3px 0 #170d05, 0 4px 0 #140b04, 0 5px 0 #110903, 0 6px 0 #0e0702, 0 7px 0 #0a0501,   /* the thickness of the board */
+    0 20px 30px rgba(0, 0, 0, .55),
+    0 44px 80px rgba(0, 0, 0, .5);
 }
 /* A thin gold line between the frame and the squares (blue while you look back through the game) */
 .board-wrap::after {
@@ -338,44 +396,30 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .sq--dark { background: var(--sq-dark); }
 .sq.is-target, .sq.is-capture-target, .piece--movable { cursor: pointer; }
 
-/* Wood grain and a soft glow on the teak squares */
-[data-board="teak"] .sq--light {
-  background:
-    repeating-linear-gradient(98deg, rgba(150, 100, 40, .07) 0 2px, transparent 2px 10px),
-    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, .12), transparent 70%),
-    var(--sq-light);
-}
-[data-board="teak"] .sq--dark {
-  background:
-    repeating-linear-gradient(98deg, rgba(0, 0, 0, .08) 0 2px, transparent 2px 9px),
-    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, .07), transparent 70%),
-    linear-gradient(135deg, #8d5731, #744425);
-}
-
-/* The marble boards: each square is cut from one big slab of marble (img/marble-*.jpg), so the
-   veins sit where they would on a real inlaid board. --c and --r say where the square is. */
-[data-board="marble"] .sq, [data-board="onyx"] .sq, [data-board="emerald"] .sq {
+/* The teak and marble boards: each square is cut from one big slab (img/wood-*.webp, img/marble-*.webp),
+   so the grain and the veins run on across the tiles like on a real inlaid board.
+   --c and --r say where the square is. */
+[data-board="teak"] .sq, [data-board="marble"] .sq, [data-board="onyx"] .sq, [data-board="emerald"] .sq {
   background-size: var(--board) var(--board);
   background-position: calc(var(--c) * var(--sq) * -1) calc(var(--r) * var(--sq) * -1);
 }
-[data-board="marble"] .sq--light  { background-image: url("img/marble-cream.jpg"); }
-[data-board="marble"] .sq--dark   { background-image: url("img/marble-brown.jpg"); }
-[data-board="onyx"] .sq--light    { background-image: url("img/marble-white.jpg"); }
-[data-board="onyx"] .sq--dark     { background-image: url("img/marble-black.jpg"); }
-[data-board="emerald"] .sq--light { background-image: url("img/marble-ivory.jpg"); }
-[data-board="emerald"] .sq--dark  { background-image: url("img/marble-green.jpg"); }
+[data-board="teak"] .sq--light { background-image: url("img/wood-maple.webp"); }
+[data-board="teak"] .sq--dark  { background-image: url("img/wood-walnut.webp"); }
+[data-board="marble"] .sq--light  { background-image: url("img/marble-cream.webp"); }
+[data-board="marble"] .sq--dark   { background-image: url("img/marble-brown.webp"); }
+[data-board="onyx"] .sq--light    { background-image: url("img/marble-white.webp"); }
+[data-board="onyx"] .sq--dark     { background-image: url("img/marble-black.webp"); }
+[data-board="emerald"] .sq--light { background-image: url("img/marble-ivory.webp"); }
+[data-board="emerald"] .sq--dark  { background-image: url("img/marble-green.webp"); }
 
-/* Small bevel on every tile, and the grain is shifted a little from tile to tile */
+/* A small bevel on every tile, so the squares look inlaid */
 .sq { box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .13), inset -1px -1px 0 rgba(0, 0, 0, .16); }
-[data-board="teak"] .sq:nth-child(3n + 1) { background-position: 0 0, 0 0, 0 0; }
-[data-board="teak"] .sq:nth-child(3n + 2) { background-position: 4px 0, 0 0, 0 0; }
-[data-board="teak"] .sq:nth-child(3n)     { background-position: 7px 0, 0 0, 0 0; }
 
 /* Highlight layer (::before). The ::after layer marks a piece that would be taken (see .is-victim). */
 .sq::before, .sq::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
 .sq--dark:hover::before { background: var(--hl-hover); }
-.sq.is-last::before { background: var(--hl-last); }
-.sq.is-selected::before { background: var(--hl-select); }
+.sq.is-last::before { background: var(--hl-last); box-shadow: inset 0 0 0 2px rgba(255, 214, 90, .4); }
+.sq.is-selected::before { background: var(--hl-select); box-shadow: inset 0 0 0 3px rgba(255, 228, 140, .8), inset 0 0 18px rgba(255, 214, 90, .6); }
 .sq.is-target:hover::before, .sq.is-capture-target:hover::before { background: rgba(247, 214, 128, .3); }
 .sq:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; z-index: 2; }
 
@@ -396,24 +440,24 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 }
 .sq.is-target:hover .hint-dot { animation: none; scale: 1.35; }
 
-/* Where a piece lands after a capture: a glowing ruby ring around a small ruby bead. */
+/* Where a piece lands after a capture: a glowing gold ring around a small gold bead (the same gold as the quiet-move dot). */
 .hint-ring {
   position: absolute; left: 50%; top: 50%; z-index: 2;
   width: 66%; aspect-ratio: 1; translate: -50% -50%;
   border-radius: 50%; pointer-events: none;
-  border: max(2.5px, calc(var(--sq) * .042)) solid #f0624a;
-  background: radial-gradient(circle, rgba(240, 98, 74, .34) 0%, rgba(240, 98, 74, .1) 62%, transparent 100%);
-  box-shadow: 0 0 12px rgba(240, 98, 74, .6), inset 0 0 12px rgba(240, 98, 74, .4);
+  border: max(2.5px, calc(var(--sq) * .042)) solid #e8b84a;
+  background: radial-gradient(circle, rgba(247, 212, 120, .34) 0%, rgba(247, 212, 120, .1) 62%, transparent 100%);
+  box-shadow: 0 0 0 1px rgba(70, 38, 6, .45), 0 0 12px rgba(247, 212, 120, .6), inset 0 0 12px rgba(247, 212, 120, .4);
   animation: ring 1.5s ease-in-out infinite;
   transition: scale .15s;
 }
 .hint-ring::after {
   content: ""; position: absolute; inset: 33%; border-radius: 50%;
-  background: radial-gradient(circle at 36% 30%, #ffc9bb, #f0624a 55%, #a82c19);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+  background: radial-gradient(circle at 36% 30%, #fff8dc 0%, #f7db8f 26%, #dcaa40 66%, #a4731c 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 0 0 1px rgba(70, 38, 6, .45);
 }
 @keyframes ring {
-  50% { scale: 1.07; box-shadow: 0 0 18px 2px rgba(240, 98, 74, .85), inset 0 0 14px rgba(240, 98, 74, .55); }
+  50% { scale: 1.07; box-shadow: 0 0 0 1px rgba(70, 38, 6, .45), 0 0 18px 2px rgba(247, 212, 120, .85), inset 0 0 14px rgba(247, 212, 120, .55); }
 }
 .sq.is-capture-target:hover .hint-ring { animation: none; scale: 1.14; }
 
@@ -449,7 +493,7 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .sq-num {
   position: absolute; top: 3%; left: 5%; z-index: 1;
   font: 600 max(8.5px, calc(var(--sq) * .165))/1 var(--font-display);
-  color: var(--sq-light); opacity: .7;
+  color: var(--sq-light); opacity: .72; text-shadow: 0 1px 1px rgba(0, 0, 0, .5);
   pointer-events: none; user-select: none;
 }
 .hide-numbers .sq-num { display: none; }
@@ -555,7 +599,7 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 [data-pieces="caps"] .piece--king.piece--b { box-shadow: 0 var(--lift) 0 #5e1010, 0 calc(var(--lift) * 2) 0 #c62f2f, 0 calc(var(--lift) * 3) 0 #4d0d0d, calc(var(--lift) * 1.6) calc(var(--lift) * 3 + 4px) 8px rgba(0, 0, 0, .55); }
 
 /* --- Photo discs: the marble set (photographs) and the gold set (pictures made by a script) ---
-   Both are round pictures seen from above (img/piece-*.png, set by --disc-w / --disc-b).
+   Both are round pictures seen from above (img/piece-*.webp, set by --disc-w / --disc-b).
    A man is just the picture (it already shows its own rounded edge) with a soft
    shadow. A king is two discs: the lower one, a little darker, peeks out below.
    The cast shadow and the orange "must capture" glow are drop-shadow filters that
@@ -628,32 +672,27 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .panel {
   display: flex; flex-direction: column;
   height: calc(var(--board) + 156px);
-  background: linear-gradient(180deg, var(--panel-2), var(--panel) 160px);
+  background:
+    linear-gradient(180deg, rgba(255, 224, 170, .04), transparent 140px),
+    linear-gradient(180deg, var(--panel-2), var(--panel) 160px);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, .35);
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .07), 0 18px 40px rgba(0, 0, 0, .4);
 }
-.panel__head { display: flex; align-items: center; padding: 16px 18px 6px; }
-.mode-chip {                          /* the kind of game; click it to start a new one */
-  padding: 5px 12px; border: 1px solid transparent; border-radius: 99px;
-  background: var(--gold-soft); color: var(--gold);
-  font-weight: 700; font-size: 12.5px; white-space: nowrap;
-  transition: border-color .15s, background .15s;
-}
-.mode-chip::after { content: " ▾"; font-size: 10px; }
-.mode-chip:hover { border-color: rgba(227, 176, 75, .5); background: rgba(227, 176, 75, .22); }
-
 .status, .statusbar {
+  --accent: var(--jade);              /* the colour of the stripe and of the soft glow behind it */
   display: flex; gap: 14px; align-items: flex-start;
-  border-radius: 12px; background: rgba(0, 0, 0, .22);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .22);     /* (for browsers that cannot mix colours) */
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 15%, transparent), rgba(0, 0, 0, .22) 75%);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--jade);
+  border-left: 4px solid var(--accent);
 }
 .status { margin: 10px 16px 8px; padding: 14px 16px; }
-.status.is-warn, .statusbar.is-warn { border-left-color: var(--must-glow); background: rgba(255, 163, 26, .09); }
-.status.is-done, .statusbar.is-done { border-left-color: var(--gold); background: var(--gold-soft); }
-.status.is-calm, .statusbar.is-calm { border-left-color: #8c7f70; }
+.status.is-warn, .statusbar.is-warn { --accent: var(--must-glow); }
+.status.is-done, .statusbar.is-done { --accent: var(--gold); }
+.status.is-calm, .statusbar.is-calm { --accent: #8c7f70; }
 .status__dot { flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 50%; }
 .status__dot[data-color="w"] { background: var(--skin-w); box-shadow: var(--skin-w-shadow); filter: var(--skin-filter); border-radius: var(--skin-radius); }
 .status__dot[data-color="b"] { background: var(--skin-b); box-shadow: var(--skin-b-shadow); filter: var(--skin-filter); border-radius: var(--skin-radius); }
@@ -685,7 +724,8 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .rv {
   display: grid; place-items: center; min-width: 38px; height: 32px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: 8px;
-  background: var(--panel-2); color: #dccfbf; font-size: 16px;
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); color: #dccfbf; font-size: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .07);
   transition: background .15s, color .15s, border-color .15s;
 }
 .rv:hover:not(:disabled) { background: var(--panel-3); color: var(--gold); border-color: rgba(227, 176, 75, .35); }
@@ -725,7 +765,12 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .movelist .mv:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .movelist .mv .x { color: #f08a78; padding: 0 1px; }
 .movelist .mv .k { width: 12px; height: 12px; color: var(--gold); flex: none; }
-.movelist .empty { grid-column: 1 / -1; padding: 22px 8px; color: var(--muted); font-size: 13.5px; font-weight: 500; }
+.movelist .empty { grid-column: 1 / -1; padding: 34px 12px 22px; text-align: center; color: var(--muted); font-size: 13.5px; font-weight: 500; }
+.movelist .empty::before {            /* a faint gold crown above the message */
+  content: ""; display: block; width: 44px; height: 44px; margin: 0 auto 12px;
+  background: var(--gold); opacity: .3;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 7.5l4.6 3.8L12 4l4.4 7.3L21 7.5l-1.9 10.2H4.9L3 7.5zM5 19.2h14v1.8H5z'/></svg>") center / contain no-repeat;
+}
 
 .rules { margin: 0; padding: 14px 18px 12px 36px; display: grid; gap: 11px; font-size: 13.5px; color: #dccfbf; }
 .rules b { display: block; color: var(--text); font-size: 13px; }
@@ -733,7 +778,7 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .diagram { margin: 0; padding: 4px 18px 8px; }
 .diagram svg { display: block; width: 100%; max-width: 190px; height: auto; aspect-ratio: 1; margin: 0 auto; border-radius: 6px; }
 .diagram figcaption { margin-top: 9px; color: var(--muted); font-size: 12.5px; }
-.diagram b { color: var(--jade); }
+.diagram b { color: var(--gold); }
 .rules__more { margin: 0; padding: 4px 18px 18px; }
 
 .controls {
@@ -743,13 +788,14 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .ctrl {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 10px 4px 9px; border: 1px solid var(--line); border-radius: 10px;
-  background: var(--panel-2); color: #dccfbf;
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); color: #dccfbf;
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .08), 0 2px 0 rgba(0, 0, 0, .35);
   font-size: 11.5px; font-weight: 700;
   transition: background .15s, color .15s, border-color .15s, transform .1s, opacity .15s;
 }
 .ctrl svg { font-size: 20px; }
-.ctrl:hover:not(:disabled) { background: var(--panel-3); color: var(--gold); border-color: rgba(227, 176, 75, .35); }
-.ctrl:active:not(:disabled) { transform: translateY(1px); }
+.ctrl:hover:not(:disabled) { background: linear-gradient(180deg, #46392d, var(--panel-3)); color: var(--gold); border-color: rgba(227, 176, 75, .35); }
+.ctrl:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255, 224, 170, .08); }
 .ctrl:disabled { opacity: .38; }
 .ctrl--danger:hover:not(:disabled) { background: rgba(226, 89, 63, .2); color: #ffb3a3; border-color: rgba(226, 89, 63, .4); }
 .ctrl:focus-visible, .btn:focus-visible, .swatch:focus-visible, .tab:focus-visible, .icon-btn:focus-visible, .rv:focus-visible, .mode-chip:focus-visible {
@@ -760,18 +806,24 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .legend {
   display: none;
   padding: 16px 16px 14px;
-  border: 1px dashed var(--line-strong); border-radius: var(--radius);
-  background: rgba(0, 0, 0, .14);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(0, 0, 0, .2), rgba(0, 0, 0, .1));
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .05);
 }
-.legend h3 { margin: 0 0 12px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.legend h3 {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 14px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.legend h3::before { content: ""; width: 7px; height: 7px; rotate: 45deg; background: var(--gold); opacity: .8; }   /* a small gold diamond */
 .legend ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .legend li { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #dccfbf; line-height: 1.35; }
 .legend b { color: var(--must-glow); }
 .lg {                                  /* a tiny square showing the marker */
   position: relative; flex: none; display: grid; place-items: center;
   width: 30px; height: 30px; border-radius: 7px; background: var(--sq-dark);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .12);
 }
+[data-board="teak"] .lg:not(.lg--king) { background: url("img/wood-walnut.webp") center / 150px; }
 .lg .hint-dot { width: 40%; animation: none; }       /* the real signs, shown small */
 .lg .hint-ring { width: 66%; animation: none; }
 .lg .x-mark { width: 66%; }
@@ -794,11 +846,15 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 /* Buttons --------------------------------------------------------------- */
 .btn {
   padding: 13px 18px; border: 1px solid var(--line-strong); border-radius: 10px;
-  background: var(--panel-2); font-weight: 700; font-size: 15px;
-  transition: background .15s;
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); font-weight: 700; font-size: 15px;
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .08), 0 2px 0 rgba(0, 0, 0, .35);
+  transition: background .15s, transform .1s;
 }
-.btn:hover { background: var(--panel-3); }
+.btn:hover { background: linear-gradient(180deg, #46392d, var(--panel-3)); }
+.btn:active { transform: translateY(1px); }
 .btn--wide { width: 100%; }
+.btn--small { padding: 8px 16px; border-radius: 8px; font-size: 13px; }
+.status .js-claim, .statusbar .js-claim { margin-top: 9px; }
 .btn--primary {
   border-color: transparent; color: #2a1b06;
   background: linear-gradient(180deg, #f6d27a, var(--gold));
@@ -817,7 +873,7 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .drawer__sheet {
   position: absolute; top: 0; right: 0; bottom: 0;
   width: min(390px, 100%); padding: 20px 22px; overflow-y: auto;
-  background: var(--panel); border-left: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel) 240px); border-left: 1px solid var(--line-strong);
   box-shadow: -14px 0 40px rgba(0, 0, 0, .5);
 }
 .drawer__head { display: flex; justify-content: space-between; align-items: center; }
@@ -829,12 +885,17 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .swatch {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   padding: 11px 6px 12px; border: 2px solid transparent; border-radius: 12px;
-  background: var(--panel-2); font-size: 13px; font-weight: 700;
-  transition: border-color .15s, background .15s;
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2)); font-size: 13px; font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .07);
+  transition: border-color .15s, background .15s, box-shadow .15s;
 }
-.swatch:hover { background: var(--panel-3); }
+.swatch:hover { background: linear-gradient(180deg, #46392d, var(--panel-3)); }
 .swatch small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
-.swatch.is-active { border-color: var(--gold); background: var(--gold-soft); }
+.swatch.is-active {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(227, 176, 75, .24), rgba(227, 176, 75, .1));
+  box-shadow: 0 0 0 1px rgba(227, 176, 75, .2), 0 6px 18px rgba(227, 176, 75, .14);
+}
 .swatch__tiles {
   width: 58px; height: 58px; margin-bottom: 3px; border-radius: 8px;
   background: conic-gradient(var(--d) 0 25%, var(--l) 0 50%, var(--d) 0 75%, var(--l) 0);
@@ -844,11 +905,11 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .swatch__tiles--photo { background: center / cover no-repeat; }      /* a board picture instead of plain colours */
 .swatch__piece { width: 40px; height: 40px; margin: 9px; border-radius: 50%; }
 .swatch__piece--classic { background: radial-gradient(circle at 34% 28%, #fffdf6, #f3e8d0 42%, #c4ae82); box-shadow: 0 3px 0 #a8935f, 0 5px 6px rgba(0, 0, 0, .45); }
-.swatch__piece--marble { background: center / cover no-repeat url("img/piece-white.png"); box-shadow: 0 3px 7px rgba(0, 0, 0, .5); }
+.swatch__piece--marble { background: center / cover no-repeat url("img/piece-white.webp"); box-shadow: 0 3px 7px rgba(0, 0, 0, .5); }
 /* two overlapping discs: the gold one in front of the black one */
 .swatch__piece--gold {
   border-radius: 0; filter: drop-shadow(0 0 1px rgba(255, 255, 255, .4)) drop-shadow(0 3px 4px rgba(0, 0, 0, .5));
-  background: url("img/piece-gold.png") right bottom / 32px 32px no-repeat, url("img/piece-lacquer.png") left top / 32px 32px no-repeat;
+  background: url("img/piece-gold.webp") right bottom / 32px 32px no-repeat, url("img/piece-lacquer.webp") left top / 32px 32px no-repeat;
 }
 .swatch__piece--caps { background: radial-gradient(circle, #e85a4f 0 52%, transparent 53%), repeating-conic-gradient(#c62f2f 0 6deg, #7d1717 6deg 12deg); box-shadow: 0 3px 0 #4d0d0d, 0 5px 6px rgba(0, 0, 0, .45); }
 
@@ -856,7 +917,7 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 .toggle input { position: absolute; opacity: 0; }
 .toggle span { position: relative; width: 42px; height: 24px; border-radius: 99px; background: #4d4339; transition: background .15s; flex: none; }
 .toggle span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; }
-.toggle input:checked + span { background: var(--gold-deep); }
+.toggle input:checked + span { background: linear-gradient(180deg, var(--gold), var(--gold-deep)); }
 .toggle input:checked + span::after { transform: translateX(18px); }
 .toggle input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
 .slider { display: flex; align-items: center; gap: 14px; padding: 0 0 10px 54px; color: var(--muted); font-size: 12.5px; }
@@ -876,8 +937,12 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
   padding: 30px 26px 24px; text-align: center;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--line-strong); border-radius: 18px;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, .65);
+  box-shadow: inset 0 1px 0 rgba(255, 224, 170, .08), 0 30px 70px rgba(0, 0, 0, .65);
   animation: pop .3s cubic-bezier(.2, 1.4, .4, 1);
+}
+.modal__card::before {                /* a thin gold line along the top edge */
+  content: ""; position: absolute; left: 24px; right: 24px; top: -1px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent); opacity: .75;
 }
 .modal__card--small { width: min(340px, calc(100% - 32px)); padding: 26px 24px 22px; }
 .modal__card--form { width: min(440px, calc(100% - 32px)); padding: 24px 24px 22px; text-align: left; }
@@ -949,35 +1014,75 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 
 /* Phones and small tablets: one column, controls pinned to the bottom ---- */
 @media (max-width: 980px) {
-  :root { --board: min(calc(100vw - 40px), calc(100svh - 300px), 640px); }
+  /* The board leaves room for everything below it (the status strip, your player card and the button bar: 452 px), so your own
+     card and clock are not hidden behind the buttons. It never gets smaller than 280 px: on a very short screen the page scrolls. */
+  :root { --board: min(calc(100vw - 40px), max(280px, calc(100vh - 452px)), 640px); }          /* (older phones do not know svh) */
+  @supports (height: 100svh) {
+    :root { --board: min(calc(100vw - 40px), max(280px, calc(100svh - 452px)), 640px); }
+  }
   .game { grid-template-columns: var(--board); padding: 14px 12px 120px; gap: 22px; }
-  .board-col { gap: 14px; }
+  .board-col { gap: 20px; }
+  .board-wrap { margin-block: calc(var(--frame) - 6px); }      /* room for the frame and its shadow */
   .panel { height: auto; }
   .panel .status { display: none; }                    /* the strip under the board shows it instead */
   .statusbar { display: flex; }
   .tabpanel { max-height: 260px; }
   .topnav { display: none; }
-  .topbar { justify-content: space-between; padding: 0 14px; height: 56px; }
+  .topbar { justify-content: space-between; gap: 12px; padding: 0 14px; height: 56px; }
   .controls {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
     background: #120e0b; border-top: 1px solid var(--line-strong);
   }
   .player { min-height: 56px; padding: 7px 10px; gap: 10px; }
-  .player__avatar { width: 40px; height: 40px; }
-  .player__avatar .mini-piece { width: 24px; height: 24px; }
+  .player__avatar { width: 42px; height: 42px; }
+  .player__avatar .mini-piece { width: 28px; height: 28px; }
   .player__name { font-size: 14.5px; gap: 6px; }
   .clock { min-width: 92px; height: 40px; font-size: 21px; padding: 0 10px; }
   .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
   .drawer__sheet { width: 100%; }
 }
+@media (max-width: 1180px) {
+  .mode-hint__long { display: none; }                  /* less room: "Mode:" instead of "Game mode:" */
+  .mode-hint__short { display: inline; }
+}
 @media (max-width: 420px) {
-  .brand__text small { display: none; }               /* the subtitle would wrap onto two lines */
+  /* A card with a clock is tight on a small board: the Thai name goes, so the side and the piece count stay on one line. */
+  .player:has([data-clock]:not([hidden])) .player__thai { display: none; }
+}
+@media (max-width: 560px) {
+  .brand__text { display: none; }                      /* the chip needs the room; the name is in the page title */
+  .topbar__tools { flex: 1; justify-content: flex-end; }
+  .mode-hint { font-size: 12.5px; }
+  .mode-pick { margin-right: auto; }
+  .mode-chip { height: 38px; padding: 0 11px 0 10px; font-size: 13px; }
+  .icon-btn { width: 36px; height: 36px; }
+}
+@media (max-width: 480px) {
+  .brand__mark { display: none; }
+  .topbar__tools { gap: 2px; }
+  .mode-chip svg { display: none; }                    /* small phones: the words matter more than the icon */
+  .mode-chip { gap: 5px; padding: 0 10px; }
+}
+@media (max-width: 380px) {                            /* the caption moves above the button, so it costs no width */
+  .mode-pick { flex-direction: column; align-items: flex-start; gap: 1px; }
+  .mode-hint { margin: 0 0 0 10px; font-size: 10.5px; line-height: 1.1; }
+  .mode-hint__long { display: inline; }
+  .mode-hint__short { display: none; }
+  .mode-chip { height: 33px; padding: 0 9px; font-size: 12.5px; }
+  .icon-btn { width: 34px; }
+}
+@media (max-width: 340px) {
+  .mode-chip { padding: 0 8px; font-size: 11.5px; }
+  .icon-btn { width: 32px; }
 }
 
 /* A phone held sideways: the board fills the height, everything else is on the right */
 @media (max-width: 980px) and (orientation: landscape) and (max-height: 560px) {
-  :root { --board: calc(100svh - 76px); }
+  :root { --board: min(calc(100vh - 76px), calc(100vw - 260px)); }      /* in a narrow window the board gives way, so the right side keeps room */
+  @supports (height: 100svh) {
+    :root { --board: min(calc(100svh - 76px), calc(100vw - 260px)); }
+  }
   .topbar { height: 48px; }
   .game {
     grid-template-columns: var(--board) minmax(0, 420px); grid-template-rows: auto auto auto 1fr;
@@ -989,9 +1094,22 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
   .statusbar { grid-column: 2; grid-row: 2; }
   #player-bottom { grid-column: 2; grid-row: 3; }
   .panel { grid-column: 2; grid-row: 4; background: none; border: 0; box-shadow: none; overflow: visible; }
-  .panel__head, .tabs, .tabpanel { display: none; }
+  .tabs, .tabpanel { display: none; }
   .controls { position: static; padding: 0; background: none; border: 0; }
   .toast { bottom: 14px; }
+}
+
+/* Fingers: bigger things to hit. The top-bar icons keep their size but get a taller invisible target (44 px). */
+@media (pointer: coarse) {
+  .icon-btn::before, .mode-chip::before { content: ""; position: absolute; inset: -2px -1px; }
+  .mode-chip { position: relative; }
+  .rv { min-width: 44px; height: 44px; }
+  .movelist .mv { min-height: 40px; }
+  .tab { min-height: 44px; }
+}
+@media (pointer: coarse) and (max-width: 560px) {
+  .icon-btn::before { inset: -4px -1px; }
+  .mode-chip::before { inset: -5px -2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

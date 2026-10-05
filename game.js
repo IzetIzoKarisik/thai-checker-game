@@ -14,8 +14,8 @@
    ========================================================================== */
 
 const SIDE = {
-  w: { name: "White", thai: "ฝ่ายขาว", player: "Player 1" },
-  b: { name: "Black", thai: "ฝ่ายดำ", player: "Player 2" },
+  w: { name: "White", thai: "ฝ่ายขาว", player: "Player 2" },      // (Black moves first, so Black is Player 1)
+  b: { name: "Black", thai: "ฝ่ายดำ", player: "Player 1" },
 };
 const PIECES_PER_SIDE = 8;
 const LEVEL_NAMES = { easy: "Easy", medium: "Medium", hard: "Hard" };   // the levels themselves are in bot.js
@@ -28,6 +28,7 @@ const view = {
   orientation: "b",   // "b" = Black at the bottom (Black moves first), "w" = White at the bottom
   thinking: false,    // true while the computer is searching for its move
   review: null,       // null = the live game; a number = the position after that many moves
+  missedMove: false,  // online: our friend moved while we were looking back through the game
   focusSquare: null,  // the board square that the Tab key stops at
 };
 
@@ -60,6 +61,8 @@ function newGame({ mode, humanColor, level, minutes, room }) {
     seen: { [positionKey(board, "b")]: 1 },   // how often each position has happened (for the draw rule)
     winner: null,     // "w", "b" or "draw" once the game is over
     reason: "",       // why the game ended
+    claimed: null,    // online: "away" or "time" if the game ended because the friend was gone (see online.js), otherwise null
+    endedAt: 0,       // when the game ended (a Date.now() time)
   };
 }
 
@@ -71,6 +74,7 @@ function startGame({ mode, side, level, minutes, room = null }) {
   thinkToken++;                       // forget any computer move still pending from the game we are replacing
   view.thinking = false;
   view.review = null;
+  gameOverWaiting = false;            // (render.js) a result window that was waiting for another window to close is no longer wanted
   newGame({ mode, humanColor, level, minutes: mode === "bot" ? 0 : minutes, room });
   view.orientation = mode === "pvp" ? "b" : humanColor;   // against the computer or online, your pieces are at the bottom
   clearSavedGame();
@@ -124,9 +128,10 @@ function snapshot() {
 }
 
 // Plays one step: a slide or a single jump.  options.dropped: the piece was dragged
-// to its square, so it needs no sliding animation.
+// to its square, so it needs no sliding animation.  options.keepReview: a move of our friend's arrives while
+// we look back through the game: stay where we are (online.js).
 function makeMove(from, move, options = {}) {
-  view.review = null;
+  if (!options.keepReview) view.review = null;
 
   // First step of a new turn.
   if (!game.chain) {
@@ -206,8 +211,14 @@ function endGame(winner, reason) {
   commitClock();
   game.winner = winner;
   game.reason = reason;
+  game.endedAt = Date.now();
   view.thinking = false;
-  clearSavedGame();
+  if (game.mode === "online") {
+    onlineGameEnded();               // (online.js) does our friend know?
+    saveGame();                      // kept, so that a reload still shows the result and a rematch can be asked for
+  } else {
+    clearSavedGame();
+  }
   setTimeout(playSound, 400, "end");
   showGameOver();
 }
@@ -276,7 +287,7 @@ async function offerDraw() {
 }
 
 async function resign() {
-  if (game.winner) return;
+  if (game.winner) { openDialog($("#gameover")); return; }     // (the button says "Result" now: show it again)
   const loser = hasOwnSide() ? game.humanColor : game.turn;
   const ok = await askConfirm({
     title: "Resign?",
@@ -359,10 +370,15 @@ function clockLeft(color) {
 }
 
 function tick() {
+  if (game.mode === "online") showAwayCountdown();           // (online.js) "you can claim the win in 1:12"
+
   if (!game.clock || game.winner || !game.turnStart) return;
 
   if (clockLeft(game.turn) <= 0) {
-    if (game.mode === "online" && game.turn !== game.humanColor) { renderClocks(); return; }   // our friend's flag: their own game tells us
+    if (game.mode === "online" && game.turn !== game.humanColor) {   // our friend's flag: their own game tells us ...
+      if (!claimTimeoutIfAway()) renderClocks();                      // ... unless they are gone (online.js)
+      return;
+    }
     commitClock();
     game.clock[game.turn] = 0;
     endGame(otherColor(game.turn), `${SIDE[game.turn].name} ran out of time`);
@@ -398,9 +414,21 @@ function stepReview(delta) {
 
 /* ==========================================================================
    6. Saving the game, so a reload does not lose it
+
+   A game against the computer or a friend on this screen is kept for the whole browser (localStorage).
+   An online game is kept in two places:
+     - in its tab (sessionStorage): a reload of this tab goes straight back into it, and two tabs on one
+       computer can still play each other;
+     - for the whole browser, under its room (localStorage "makhos.online.<ROOM>.<host|guest>"): so that a
+       closed tab, a closed browser or a phone that threw the page away can come back to the game later.
+   A tab that has an online game open writes the time into "<that key>.alive" every few seconds, so that
+   another tab does not take over a game that is still open somewhere.
    ========================================================================== */
 
 const SAVE_KEY = "makhos.game";
+const ONLINE_SAVE_PREFIX = "makhos.online.";
+const ONLINE_SAVE_HOURS = 24;          // an online game is not offered again after this long
+const ALIVE_SECONDS = 10;              // a game whose tab wrote "alive" more recently than this is still open in that tab
 
 function bumpSeen(key) {
   game.seen[key] = (game.seen[key] || 0) + 1;
@@ -413,55 +441,133 @@ function recomputeSeen() {
   bumpSeen(positionKey(game.board, game.turn));
 }
 
-// A game against the computer or a friend on this screen is kept for the whole browser. An online game
-// belongs to its tab (sessionStorage), so two tabs on one computer can play each other.
+const onlineSaveKey = (room) => `${ONLINE_SAVE_PREFIX}${room.code}.${room.role}`;
+
 function saveGame() {
-  if (game.winner || (game.moves.length === 0 && !game.room) || game.chain) return;   // in the middle of a capture the board is not a position to come back to
+  const finishedOnline = Boolean(game.winner) && Boolean(game.room);      // kept for the result and the rematch
+  const inProgress = !game.winner && !game.chain && (game.moves.length > 0 || Boolean(game.room));   // (in the middle of a capture the board is not a position to come back to)
+  if (!finishedOnline && !inProgress) return;
   try {
-    const { mode, humanColor, level, minutes, room, board, turn, moves, last, history, quiet } = game;
+    const { mode, humanColor, level, minutes, room, board, turn, moves, last, history, quiet, winner, reason, claimed, endedAt } = game;
     const clock = game.clock && { w: clockLeft("w"), b: clockLeft("b") };
-    const saved = { mode, humanColor, level, minutes, room, board, turn, moves, last, history, quiet, clock };
-    (game.room ? sessionStorage : localStorage).setItem(SAVE_KEY, JSON.stringify({ version: 1, orientation: view.orientation, game: saved }));
+    const saved = { mode, humanColor, level, minutes, room, board, turn, moves, last, history, quiet, clock, winner, reason, claimed, endedAt };
+    const text = JSON.stringify({ version: 1, orientation: view.orientation, savedAt: Date.now(), game: saved });
+    if (game.room) {
+      sessionStorage.setItem(SAVE_KEY, text);
+      localStorage.setItem(onlineSaveKey(game.room), text);
+      markOnlineGameAlive();                                  // (a game that has just started is open here already, before the first beat)
+    } else {
+      localStorage.setItem(SAVE_KEY, text);
+    }
   } catch { /* private mode or storage full: the game just is not saved */ }
+}
+
+// The saved game of this tab (an online game), or null.
+function thisTabsSavedGame() {
+  try { return sessionStorage.getItem(SAVE_KEY); } catch { return null; }
 }
 
 function clearSavedGame() {
   try { localStorage.removeItem(SAVE_KEY); sessionStorage.removeItem(SAVE_KEY); } catch { /* nothing to do */ }
 }
 
+// Forgets the saved copies of an online game: it was left, or it can not go on.
+function forgetOnlineGame(room) {
+  if (!room) return;
+  try {
+    localStorage.removeItem(onlineSaveKey(room));
+    localStorage.removeItem(onlineSaveKey(room) + ".alive");
+    const inThisTab = JSON.parse(sessionStorage.getItem(SAVE_KEY))?.game?.room;
+    if (inThisTab && inThisTab.code === room.code) sessionStorage.removeItem(SAVE_KEY);
+  } catch { /* nothing to do */ }
+}
+
+// Called every few seconds: "this tab has the online game open".
+function markOnlineGameAlive() {
+  if (!game.room || game.winner) return;
+  try { localStorage.setItem(onlineSaveKey(game.room) + ".alive", String(Date.now())); } catch { /* not saved */ }
+}
+
+function markOnlineGameClosed() {
+  if (!game.room) return;
+  try { localStorage.removeItem(onlineSaveKey(game.room) + ".alive"); } catch { /* not saved */ }
+}
+
+// The unfinished online games saved for the whole browser that no tab has open, newest first: { text, saved }.
+// Old and damaged copies are thrown away on the way.
+function savedOnlineGames() {
+  const found = [];
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(ONLINE_SAVE_PREFIX) || key.endsWith(".alive")) continue;
+      const text = localStorage.getItem(key);
+      let data = null;
+      try { data = JSON.parse(text); } catch { /* damaged: thrown away below */ }
+      const saved = data && data.version === 1 && data.game;
+      const fresh = saved && Date.now() - data.savedAt < ONLINE_SAVE_HOURS * 3600 * 1000;
+      if (!saved || !fresh || !isSavedGameValid(saved)) { localStorage.removeItem(key); localStorage.removeItem(key + ".alive"); continue; }
+      const openElsewhere = Date.now() - Number(localStorage.getItem(key + ".alive")) < ALIVE_SECONDS * 1000;
+      if (!saved.winner && !openElsewhere) found.push({ text, saved, savedAt: data.savedAt });
+    }
+  } catch { /* no storage: nothing to find */ }
+  return found.sort((a, b) => b.savedAt - a.savedAt);
+}
+
 function isBoardValid(board) {
-  return Boolean(board) && typeof board === "object"
-    && Object.keys(board).every((square) => /^[a-h][1-8]$/.test(square) && isDarkSquare(square) && /^[wWbB]$/.test(board[square]));
+  if (!board || typeof board !== "object") return false;
+  const counts = { w: 0, b: 0 };
+  for (const square of Object.keys(board)) {
+    if (!/^[a-h][1-8]$/.test(square) || !isDarkSquare(square) || !/^[wWbB]$/.test(board[square])) return false;
+    counts[colorOf(board[square])]++;
+  }
+  return counts.w <= PIECES_PER_SIDE && counts.b <= PIECES_PER_SIDE;       // (nobody ever has more than they started with)
+}
+
+// The last move of a saved position: nothing yet, or the squares it touched and the pieces it took.
+function isLastMoveValid(last) {
+  const squares = (list) => Array.isArray(list) && list.every((square) => /^[a-h][1-8]$/.test(square));
+  return last === null || (Boolean(last) && squares(last.path) && (last.captured === undefined || squares(last.captured)));
 }
 
 function isSavedGameValid(saved) {
   const isColor = (value) => value === "w" || value === "b";
   const isMove = (move) => Boolean(move) && Array.isArray(move.path) && move.path.every((square) => /^[a-h][1-8]$/.test(square));
   const isOnline = saved.mode === "online";
+  const finished = saved.winner !== null && saved.winner !== undefined;       // (only an online game is kept after it ended)
+  const unfinishedTurns = Array.isArray(saved.history) && Array.isArray(saved.moves) ? saved.history.length - saved.moves.length : NaN;   // 1 if the game ended in the middle of a capture
   return (saved.mode === "pvp" || saved.mode === "bot" || isOnline)
     && isColor(saved.turn) && isColor(saved.humanColor)
     && Boolean(BOT_LEVELS[saved.level])
     && isBoardValid(saved.board)
     && Array.isArray(saved.moves) && saved.moves.every(isMove)
-    && Array.isArray(saved.history) && saved.history.every((past) => past && isBoardValid(past.board) && isColor(past.turn))
-    && (saved.moves.length > 0 || isOnline) && saved.history.length === saved.moves.length   // (an online game is saved from the moment it starts)
+    && isLastMoveValid(saved.last ?? null)
+    && Array.isArray(saved.history) && saved.history.every((past) => past && isBoardValid(past.board) && isColor(past.turn) && isLastMoveValid(past.last ?? null))
+    && (saved.moves.length > 0 || isOnline) && (unfinishedTurns === 0 || (finished && unfinishedTurns === 1))   // (an online game is saved from the moment it starts)
     && (isOnline ? isRoomValid(saved.room) : !saved.room)
+    && (!finished || (isOnline && ["w", "b", "draw"].includes(saved.winner) && typeof saved.reason === "string"))
+    && (saved.claimed == null || saved.claimed === "away" || saved.claimed === "time")
     && (saved.clock == null || (typeof saved.clock.w === "number" && typeof saved.clock.b === "number"));
 }
 
-// Brings back the game saved by saveGame(). Returns false if there is none, or it looks damaged.
-function restoreSavedGame() {
+// Brings back the game saved by saveGame() (`text`: a saved copy; without it, the one of this tab or of this browser).
+// Returns false if there is none, or it looks damaged.
+function restoreSavedGame(text) {
   try {
-    const data = JSON.parse(sessionStorage.getItem(SAVE_KEY) || localStorage.getItem(SAVE_KEY));
+    const data = JSON.parse(text === undefined ? sessionStorage.getItem(SAVE_KEY) || localStorage.getItem(SAVE_KEY) : text);
     const saved = data && data.version === 1 && data.game;
     if (!saved || !isSavedGameValid(saved)) return false;
 
+    thinkToken++;                          // (a computer move still being thought up for the game we replace is forgotten)
     game = {
       ...saved, botColor: otherColor(saved.humanColor), minutes: saved.minutes || 0, clock: saved.clock || null, room: saved.room || null,
-      selected: null, targets: [], chain: null, turnStart: null, winner: null, reason: "", seen: {},
+      selected: null, targets: [], chain: null, turnStart: null, seen: {},
+      winner: saved.winner ?? null, reason: saved.reason || "", claimed: saved.claimed || null, endedAt: saved.endedAt || 0,
+      savedAt: Number.isFinite(data.savedAt) ? data.savedAt : 0,      // (online.js uses it after a reload: how long ago we last heard from our friend)
     };
     recomputeSeen();
     startClock();
+    // An online game goes on counting while its page is closed: a reload or a closed tab gives no time back.
+    if (game.room && game.turnStart && Number.isFinite(data.savedAt)) game.turnStart = Math.min(game.turnStart, data.savedAt);
     view.orientation = data.orientation === "w" ? "w" : "b";
     view.review = null;
     view.thinking = false;

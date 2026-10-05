@@ -22,7 +22,8 @@ function openDialog(element) {
   element.hidden = false;
   element.opener = document.activeElement;
   dialogStack.push(element);
-  ($("[data-autofocus]", element) || focusableIn(element)[0])?.focus();
+  element.scrollTop = 0;                                     // a tall window (How to play on a phone) starts at its top, not at its last button
+  ($("[data-autofocus]", element) || focusableIn(element)[0])?.focus({ preventScroll: true });
 }
 
 function closeDialog(element) {
@@ -33,6 +34,7 @@ function closeDialog(element) {
   if (element.opener?.isConnected) element.opener.focus();
   element.opener = null;
   element.onclosed?.();
+  if (gameOverWaiting && dialogStack.length === 0) openGameOverWindow();   // (render.js) the game ended while this window was open
 }
 
 // Esc or a click outside: a dialog may have its own way to say "no" (the confirm one).
@@ -67,9 +69,18 @@ function onDialogKeydown(event) {
 
 // Asks a question in a window of our own (the browser's confirm() box does not fit the design).
 // Resolves to true for the yes button, false for the no button, Esc or a click outside.
-function askConfirm({ title, text, yes = "OK", no = "Cancel", danger = false }) {
+// A question that comes while another one is open waits for its turn (a draw offer must not be refused just because
+// the player was reading another question). `stillNeeded` says whether it is still worth asking when its turn comes.
+let questionChain = Promise.resolve();
+function askConfirm(question) {
+  const answer = questionChain.then(() => showQuestion(question));
+  questionChain = answer.catch(() => {});
+  return answer;
+}
+
+function showQuestion({ title, text, yes = "OK", no = "Cancel", danger = false, stillNeeded = () => true }) {
   const dialog = $("#confirm");
-  if (!dialog.hidden) return Promise.resolve(false);
+  if (!stillNeeded() || !dialog.hidden) return Promise.resolve(false);
   $("#confirm-title").textContent = title;
   $("#confirm-text").textContent = text;
   $("#confirm-yes").textContent = yes;
@@ -193,7 +204,8 @@ function renderDraft() {
   $("#ng-level-hint").textContent = LEVEL_HINTS[draft.level];
 }
 
-function startFromDialog() {
+async function startFromDialog() {
+  if (!(await confirmLeavingOnlineGame())) return;          // leaving an online game on purpose makes the friend the winner: ask first
   Object.assign(settings, draft);
   saveSettings();
   closeDialog($("#newgame"));
@@ -283,6 +295,7 @@ function bindUI() {
   $$(".tab").forEach((tab) => tab.addEventListener("click", () => showTab(tab.dataset.tab)));
 
   document.addEventListener("visibilitychange", updateTitle);
+  window.addEventListener("pagehide", markOnlineGameClosed);   // this tab lets go of its online game: another tab may take it over at once
 }
 
 /* ==========================================================================
@@ -292,7 +305,7 @@ function bindUI() {
 // Handy for screenshots and sharing, for example:
 //   index.html?vs=computer&botSide=b&level=hard&board=green&pieces=classic&flip=1
 //   (botSide is the side the computer plays; clock=5 sets minutes for a two-player game;
-//    new=1 ignores a saved game; tour=0 hides "How to play"; room=K7M2QX is a friend's invitation;
+//    new=1 ignores a saved game; tour=0 hides "How to play"; room=483920 is a friend's invitation;
 //    peerServer=host:port uses another introduction server for online games, see online.js)
 function applyUrlParams(params) {
   if (params.get("board")) settings.board = params.get("board");
@@ -312,22 +325,59 @@ bindUI();
 bindInput();
 applyAppearance();
 
-const resumed = !params.has("vs") && !params.has("new") && restoreSavedGame();
-if (resumed) {
-  const drawReason = automaticDrawReason();       // a game saved before a draw rule existed may already be drawn
+const invitation = cleanCode(params.get("room") || "");      // a friend's link (?room=483920)
+const ignoresSavedGame = params.has("vs") || params.has("new");
+
+// A saved game that cannot even be drawn is thrown away, so a damaged save can never break the page.
+// Which one is brought back: the online game of this tab (a reload); for an invitation link, the online game we
+// had in that room before (a closed tab); otherwise the game saved for the whole browser.
+function restoreAndDraw() {
+  if (ignoresSavedGame) return false;
+  const earlier = invitation && savedOnlineGames().find((found) => found.saved.room.code === invitation && found.saved.room.role === "guest");
+  const text = thisTabsSavedGame() || (earlier ? earlier.text : undefined);
+  if (!restoreSavedGame(text)) return false;
+  try { render(); return true; } catch { clearSavedGame(); return false; }
+}
+
+// A game was restored: say so, and if it is an online game, go back into its room (even a finished one: for the rematch).
+function afterRestoring() {
+  const drawReason = game.winner ? null : automaticDrawReason();    // a game saved before a draw rule existed may already be drawn
   if (drawReason) endGame("draw", drawReason);
+  else if (game.winner) { toast("Welcome back! Your online game has ended."); showGameOver(); }
   else toast(game.room ? "Welcome back! Going back into your online game…" : "Welcome back! Your game was restored. Press New to start another.");
   render();
   maybeBotMove();
-  if (game.room && !game.winner) resumeOnline();
-} else {
-  startGame(settings);
+  if (game.room) {
+    saveGame();                           // (also puts the game in this tab, so that a reload of this tab comes straight back)
+    markOnlineGameAlive();
+    resumeOnline();
+  }
 }
+
+// No online game to go back into here, but one was left in this browser (a closed tab or browser): offer to continue it.
+async function offerToContinue({ text, saved }) {
+  const { code } = saved.room;
+  const yes = await askConfirm({
+    title: "Continue your online game?",
+    text: `Room ${code.slice(0, 3)} ${code.slice(3)} · you play ${SIDE[saved.humanColor].name}. Your opponent may be waiting for you.`,
+    yes: "Continue", no: "No, forget it",
+  });
+  if (!yes) { forgetOnlineGame(saved.room); return; }
+  if (!restoreSavedGame(text)) { forgetOnlineGame(saved.room); toast("That game could not be brought back."); return; }
+  afterRestoring();
+}
+
+const resumed = restoreAndDraw();
+if (resumed) afterRestoring();
+else startGame(settings);
 if (params.get("flip")) flipBoard();
 
-// A link from a friend (?room=K7M2QX) opens the Join window, unless we are already in that room.
-const invitation = cleanCode(params.get("room") || "");
+const earlierOnlineGame = !ignoresSavedGame && !invitation && !game.room ? savedOnlineGames()[0] : null;
+if (earlierOnlineGame) offerToContinue(earlierOnlineGame);
+
+// A link from a friend (?room=483920) opens the Join window, unless we are already in that room.
 if (invitation && !(resumed && game.room?.code === invitation)) openOnline("join", invitation);
-if (!settings.tourSeen && params.get("tour") !== "0" && !resumed && !invitation) openDialog($("#tour"));
+if (!settings.tourSeen && params.get("tour") !== "0" && !resumed && !invitation && !earlierOnlineGame) openDialog($("#tour"));
 
 setInterval(tick, 250);
+setInterval(markOnlineGameAlive, 3000);

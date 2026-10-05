@@ -13,7 +13,9 @@ const MUSIC_FILE = "sounds/bach-prelude-c-major.ogg";
 
 let musicVolume = 0.55;      // 0–1: the "Music" slider in Settings. The recording itself is soft; this is a bit quieter than before.
 
-const music = new Audio(MUSIC_FILE);
+const music = new Audio();
+music.preload = "none";      // the file (1.4 MB) is fetched at the first play(), so it does not compete with the board pictures on a slow phone
+music.src = MUSIC_FILE;
 music.loop = true;
 music.volume = 0;
 

@@ -91,7 +91,12 @@ function playRecording(kind, volume) {
   sound.play().catch(() => { /* the browser may block sound before the first click */ });
 }
 
+// A sound that cannot be played must never get in the way of the game, so any audio problem is ignored.
 function playSound(kind) {
+  try { makeSound(kind); } catch { /* no sound: the game goes on */ }
+}
+
+function makeSound(kind) {
   if (!soundOn || soundVolume === 0) return;
   if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;   // browsers allow sound only after the first click or key press
   if (!audio) setUpSound(new AudioContext());

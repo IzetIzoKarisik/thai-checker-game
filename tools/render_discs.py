@@ -1,11 +1,12 @@
-"""Draws the "Black & gold" pieces (img/piece-gold.png, img/piece-lacquer.png): top-down discs from a height map with simple lighting.
+"""Draws the "Black & gold" pieces (img/piece-gold.webp, img/piece-lacquer.webp): top-down discs from a height map with simple lighting.
 Usage: python3 tools/render_discs.py   (needs numpy and Pillow; results go to tools/out/, copy them to img/)"""
 import numpy as np
 from PIL import Image
 import os
 
-S = 720                       # drawn at 720 px, shown at 360 px (smooth edges)
-FINAL = 360
+S = 512                       # drawn at 512 px, shown at 256 px (smooth edges)
+FINAL = 256                   # a power of two, and not much bigger than a piece on screen: the fine lathe lines of a bigger picture
+                              # turn into a busy moire pattern on some pieces when the browser shrinks it six times
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 os.makedirs(OUT, exist_ok=True)
 
@@ -123,5 +124,5 @@ def disc(kind, seed):
 if __name__ == "__main__":
     for kind in ("gold", "lacquer"):
         im = disc(kind, 7)
-        im.save(os.path.join(OUT, f"piece-{kind}.png"), optimize=True)
-        print(kind, os.path.getsize(os.path.join(OUT, f"piece-{kind}.png")) // 1024, "KB")
+        im.save(os.path.join(OUT, f"piece-{kind}.webp"), quality=88, method=6)
+        print(kind, os.path.getsize(os.path.join(OUT, f"piece-{kind}.webp")) // 1024, "KB")
